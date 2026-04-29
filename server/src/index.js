@@ -10,8 +10,24 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
   const app = express();
   const activeClients = new Set();
   const reminderScheduler = scheduler || new ReminderScheduler(store);
+  const allowedOrigins = new Set(
+    [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      process.env.FRONTEND_URL
+    ].filter(Boolean)
+  );
 
-  app.use(cors());
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.has(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`CORS blocked origin: ${origin}`));
+      }
+    })
+  );
   app.use(express.json());
 
   app.get('/api/health', (req, res) => {

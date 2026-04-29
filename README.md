@@ -45,6 +45,13 @@ Create `server/.env` if you want to customize the API port:
 
 ```bash
 PORT=4000
+FRONTEND_URL=http://localhost:5173
+```
+
+Create `client/.env.local` only if your local backend is not on `http://localhost:4000`:
+
+```bash
+VITE_API_URL=http://localhost:4000
 ```
 
 MotivateMe works entirely from local task storage and the curated quote library.
@@ -68,6 +75,64 @@ You can also run them separately:
 npm run dev --workspace server
 npm run dev --workspace client
 ```
+
+## Deployment
+
+Deploy the backend to Render first, then deploy the frontend to Vercel with the Render backend URL.
+
+### Render Backend
+
+Create a new Render Web Service:
+
+- Root Directory: `server`
+- Runtime: `Node`
+- Build Command: `npm install`
+- Start Command: `npm start`
+- Health Check Path: `/api/health`
+
+Required Render environment variables:
+
+```bash
+NODE_ENV=production
+FRONTEND_URL=https://your-vercel-app.vercel.app
+```
+
+Optional Render environment variables:
+
+```bash
+PORT=4000
+```
+
+After deployment, copy the Render service URL, for example:
+
+```bash
+https://motivateme-api.onrender.com
+```
+
+Note: the current MVP uses JSON file storage on the backend instance. This is fine for a demo, but Render instance files are not durable database storage for production use.
+
+### Vercel Frontend
+
+Create a new Vercel project:
+
+- Framework Preset: `Vite`
+- Root Directory: `client`
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
+
+Required Vercel environment variable:
+
+```bash
+VITE_API_URL=https://your-render-service.onrender.com
+```
+
+After Vercel gives you the frontend URL, set the same URL as `FRONTEND_URL` in Render, then redeploy the Render service so CORS allows the deployed frontend.
+
+Local fallback behavior:
+
+- If `VITE_API_URL` is missing, the frontend uses `http://localhost:4000`.
+- The backend allows `http://localhost:5173`, `http://127.0.0.1:5173`, and `FRONTEND_URL`.
 
 ## API
 

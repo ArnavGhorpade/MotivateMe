@@ -40,14 +40,20 @@ const repeatIntervals = [
   { value: 'custom', label: 'Custom interval' }
 ];
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
 const api = {
   async listTasks() {
-    const res = await fetch('/api/tasks');
+    const res = await fetch(apiUrl('/api/tasks'));
     if (!res.ok) throw new Error('Could not load tasks.');
     return res.json();
   },
   async createTask(payload) {
-    const res = await fetch('/api/tasks', {
+    const res = await fetch(apiUrl('/api/tasks'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -59,7 +65,7 @@ const api = {
     return res.json();
   },
   async updateTask(id, payload) {
-    const res = await fetch(`/api/tasks/${id}`, {
+    const res = await fetch(apiUrl(`/api/tasks/${id}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -68,13 +74,13 @@ const api = {
     return res.json();
   },
   async deleteTask(id) {
-    const res = await fetch(`/api/tasks/${id}`, {
+    const res = await fetch(apiUrl(`/api/tasks/${id}`), {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Could not delete task.');
   },
   async snoozeTask(id, minutes) {
-    const res = await fetch(`/api/tasks/${id}/snooze`, {
+    const res = await fetch(apiUrl(`/api/tasks/${id}/snooze`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ minutes })
@@ -138,7 +144,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const events = new EventSource('/api/reminders/stream');
+    const events = new EventSource(apiUrl('/api/reminders/stream'));
     events.addEventListener('reminder', (event) => {
       const reminder = JSON.parse(event.data);
       setBanner(reminder);
