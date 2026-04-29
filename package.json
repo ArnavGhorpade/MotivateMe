@@ -1,0 +1,20 @@
+{
+  "name": "motivateme",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A motivation and task reminder MVP for students.",
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev": "concurrently \"npm run dev --workspace server\" \"npm run dev --workspace client\"",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "test": "npm run test --workspace server"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

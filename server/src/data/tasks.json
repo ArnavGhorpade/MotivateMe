@@ -1,0 +1,26 @@
+[
+  {
+    "id": "2373e9f1-21f8-40c4-b5f0-93eea1fd5fdf",
+    "title": "Complete Foundation Module",
+    "description": "",
+    "reminderAt": "2026-04-29T21:34:00.000Z",
+    "reminderOffsetMinutes": 5,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": null,
+    "reminderCount": 13,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "lastReminder": {
+      "text": "Well begun is half done.",
+      "author": "Aristotle",
+      "type": "motivation",
+      "source": "local"
+    },
+    "completed": true,
+    "remindedAt": "2026-04-29T21:42:21.734Z",
+    "createdAt": "2026-04-29T21:29:40.525Z",
+    "updatedAt": "2026-04-29T21:42:45.661Z"
+  }
+]

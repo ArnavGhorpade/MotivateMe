@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: #020617;
+  }
+}
+
+@layer components {
+  .field-label {
+    @apply mb-2 block text-sm font-semibold text-slate-200;
+  }
+
+  .field-input {
+    @apply w-full rounded-lg border border-white/10 bg-slate-950/70 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-blue-300/60 focus:ring-4 focus:ring-blue-400/10;
+  }
+}
