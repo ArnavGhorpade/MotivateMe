@@ -1,5 +1,65 @@
 [
   {
+    "id": "1eec22c5-4726-4c5e-8f91-8ae1c582c817",
+    "title": "Complete MAVEN Linux Packet",
+    "description": "",
+    "reminderAt": "2026-05-08T22:23:47.922Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 5,
+    "nextReminderAt": "2026-05-08T22:28:56.689Z",
+    "reminderCount": 1,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "direct",
+    "lastReminder": {
+      "text": "Put your materials in front of you and begin before the task grows larger in your mind.",
+      "author": "Unknown",
+      "type": "motivation",
+      "source": "local",
+      "tone": "direct",
+      "stage": "initial",
+      "sourceLabel": "Curated local quote",
+      "toneLabel": "Direct nudge"
+    },
+    "completed": false,
+    "remindedAt": "2026-05-08T22:23:56.688Z",
+    "createdAt": "2026-05-08T22:23:47.930Z",
+    "updatedAt": "2026-05-08T22:25:51.397Z",
+    "order": 1
+  },
+  {
+    "id": "2a4a6685-aa2e-4d2f-9754-8b03d842f98b",
+    "title": "Complete Google Recommendations",
+    "description": "",
+    "reminderAt": "2026-05-08T22:03:03.031Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-08T22:29:16.011Z",
+    "reminderCount": 25,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": {
+      "text": "Discipline shows up here, on Complete Google Recommendations, right now.",
+      "author": "MotivateMe",
+      "type": "identity",
+      "source": "nudge",
+      "tone": "tough",
+      "stage": "identity",
+      "sourceLabel": "Identity nudge",
+      "toneLabel": "Tough nudge"
+    },
+    "completed": false,
+    "remindedAt": "2026-05-08T22:28:16.010Z",
+    "createdAt": "2026-05-08T22:03:03.041Z",
+    "updatedAt": "2026-05-08T22:28:16.011Z",
+    "order": 0
+  },
+  {
     "id": "2373e9f1-21f8-40c4-b5f0-93eea1fd5fdf",
     "title": "Complete Foundation Module",
     "description": "",
@@ -26,6 +86,7 @@
     "remindedAt": "2026-05-08T18:37:25.284Z",
     "createdAt": "2026-04-29T21:29:40.525Z",
     "updatedAt": "2026-05-08T18:37:29.961Z",
-    "nudgeTone": "tough"
+    "nudgeTone": "tough",
+    "order": -1777498180525
   }
 ]

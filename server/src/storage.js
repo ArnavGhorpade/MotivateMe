@@ -77,6 +77,9 @@ export class TaskStore {
     const reminderOffsetMinutes = normalizeCustomMinutes(input.reminderOffsetMinutes, reminderOffsets);
     const repeatIntervalMinutes = normalizeCustomMinutes(input.repeatIntervalMinutes, repeatIntervals);
     const reminderAt = new Date(input.reminderAt).toISOString();
+    const minActiveOrder = tasks
+      .filter((existing) => !existing.completed && Number.isFinite(existing.order))
+      .reduce((min, existing) => Math.min(min, existing.order), 0);
     const task = {
       id: crypto.randomUUID(),
       title: input.title.trim(),
@@ -91,6 +94,7 @@ export class TaskStore {
       lastReminder: null,
       completed: false,
       remindedAt: null,
+      order: minActiveOrder - 1,
       createdAt: now,
       updatedAt: now
     };
@@ -107,6 +111,7 @@ export class TaskStore {
       task.remindedAt && repeatIntervalMinutes === 0
         ? null
         : calculateNextReminderAt(task.reminderAt, reminderOffsetMinutes);
+    const fallbackOrder = task.createdAt ? -new Date(task.createdAt).getTime() : 0;
     return {
       ...task,
       reminderOffsetMinutes,
@@ -114,7 +119,8 @@ export class TaskStore {
       reminderCount: Number.isInteger(task.reminderCount) ? task.reminderCount : task.remindedAt ? 1 : 0,
       nextReminderAt: completed ? null : task.nextReminderAt ?? fallbackNextReminderAt,
       quotePreference: normalizeQuotePreference(task.quotePreference),
-      nudgeTone: normalizeNudgeTone(task.nudgeTone)
+      nudgeTone: normalizeNudgeTone(task.nudgeTone),
+      order: Number.isFinite(task.order) ? task.order : fallbackOrder
     };
   }
 
@@ -184,6 +190,26 @@ export class TaskStore {
     if (nextTasks.length === tasks.length) return false;
     await this.writeAll(nextTasks);
     return true;
+  }
+
+  async reorder(orderedIds) {
+    if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== 'string')) {
+      return { tasks: null, error: 'order must be an array of task ids.' };
+    }
+    const tasks = await this.readAll();
+    const idIndex = new Map(orderedIds.map((id, index) => [id, index]));
+    const missing = orderedIds.filter((id) => !tasks.some((task) => task.id === id));
+    if (missing.length) {
+      return { tasks: null, error: `Unknown task id(s): ${missing.join(', ')}` };
+    }
+    const now = new Date().toISOString();
+    const updated = tasks.map((task) =>
+      idIndex.has(task.id)
+        ? { ...task, order: idIndex.get(task.id), updatedAt: now }
+        : task
+    );
+    await this.writeAll(updated);
+    return { tasks: updated, error: null };
   }
 
   async snooze(id, minutes) {

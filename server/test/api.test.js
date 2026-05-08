@@ -222,6 +222,79 @@ test('defaults nudge tone to supportive and accepts valid tones', async () => {
   }
 });
 
+test('new tasks receive a smaller order than existing active tasks so they sort first', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'motivateme-'));
+  const store = new TaskStore(path.join(dir, 'tasks.json'));
+  try {
+    const first = await store.create({
+      title: 'First',
+      reminderAt: new Date(Date.now() + 60000).toISOString()
+    });
+    const second = await store.create({
+      title: 'Second',
+      reminderAt: new Date(Date.now() + 120000).toISOString()
+    });
+    assert.ok(Number.isFinite(first.order));
+    assert.ok(Number.isFinite(second.order));
+    assert.ok(second.order < first.order);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('PUT /api/tasks/order persists task order across reads', async () => {
+  const server = await withServer();
+  try {
+    const reminderAt = new Date(Date.now() + 60000).toISOString();
+    const titles = ['Alpha', 'Beta', 'Gamma'];
+    const created = [];
+    for (const title of titles) {
+      const res = await fetch(`${server.baseUrl}/api/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, reminderAt })
+      });
+      created.push(await res.json());
+    }
+    const desired = [created[1].id, created[2].id, created[0].id];
+
+    const reorderRes = await fetch(`${server.baseUrl}/api/tasks/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: desired })
+    });
+    assert.equal(reorderRes.status, 200);
+
+    const listRes = await fetch(`${server.baseUrl}/api/tasks`);
+    const tasks = await listRes.json();
+    const sorted = [...tasks].sort((a, b) => a.order - b.order).map((task) => task.id);
+    assert.deepEqual(sorted, desired);
+
+    const refetchRes = await fetch(`${server.baseUrl}/api/tasks`);
+    const refetched = await refetchRes.json();
+    const sortedAgain = [...refetched].sort((a, b) => a.order - b.order).map((task) => task.id);
+    assert.deepEqual(sortedAgain, desired);
+  } finally {
+    await server.close();
+  }
+});
+
+test('PUT /api/tasks/order rejects unknown task ids', async () => {
+  const server = await withServer();
+  try {
+    const res = await fetch(`${server.baseUrl}/api/tasks/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: ['00000000-0000-0000-0000-000000000000'] })
+    });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.ok(body.error);
+  } finally {
+    await server.close();
+  }
+});
+
 test('PATCH updates editable fields and recalculates nextReminderAt when timing changes', async () => {
   const server = await withServer();
   try {

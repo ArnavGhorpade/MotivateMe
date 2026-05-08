@@ -94,6 +94,18 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
     }
   });
 
+  app.put('/api/tasks/order', async (req, res, next) => {
+    try {
+      const { tasks, error } = await store.reorder(req.body?.order);
+      if (!tasks) {
+        return res.status(400).json({ error });
+      }
+      return res.json(tasks);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   app.post('/api/tasks/:id/snooze', async (req, res, next) => {
     try {
       const { task, error } = await store.snooze(req.params.id, req.body?.minutes);

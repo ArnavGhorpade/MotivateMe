@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock3,
+  GripVertical,
   Loader2,
   Pencil,
   Plus,
@@ -16,6 +17,22 @@ import {
   Trash2,
   X
 } from 'lucide-react';
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import './styles.css';
 
 const quoteModes = [
@@ -89,6 +106,30 @@ const api = {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Could not delete task.');
+  },
+  async snoozeTask(id, minutes) {
+    const res = await fetch(apiUrl(`/api/tasks/${id}/snooze`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes })
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Could not snooze task.');
+    }
+    return res.json();
+  },
+  async reorderTasks(orderedIds) {
+    const res = await fetch(apiUrl('/api/tasks/order'), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderedIds })
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Could not reorder tasks.');
+    }
+    return res.json();
   }
 };
 
@@ -216,6 +257,31 @@ function App() {
     };
   }, [tasks]);
 
+  const activeTasks = useMemo(
+    () =>
+      tasks
+        .filter((task) => !task.completed)
+        .sort((a, b) => {
+          const aOrder = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+          const bOrder = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          const aTime = a.nextReminderAt ? new Date(a.nextReminderAt).getTime() : Number.POSITIVE_INFINITY;
+          const bTime = b.nextReminderAt ? new Date(b.nextReminderAt).getTime() : Number.POSITIVE_INFINITY;
+          return aTime - bTime;
+        }),
+    [tasks]
+  );
+
+  const completedTasks = useMemo(
+    () =>
+      tasks
+        .filter((task) => task.completed)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    [tasks]
+  );
+
+  const focusTask = activeTasks[0] || null;
+
   async function handleSubmit(event) {
     event.preventDefault();
     setSaving(true);
@@ -332,6 +398,42 @@ function App() {
     }
   }
 
+  async function handleSnoozeTask(taskId, minutes) {
+    const previous = tasks;
+    try {
+      const updated = await api.snoozeTask(taskId, minutes);
+      setTasks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setBanner((current) =>
+        current?.taskId === updated.id ? { ...current, followUpAt: updated.nextReminderAt } : current
+      );
+      addToast({
+        title: `Snoozed ${minutes} minutes`,
+        message: `Next reminder: ${formatReminder(updated.nextReminderAt)}.`,
+        tone: 'success'
+      });
+    } catch (err) {
+      setTasks(previous);
+      addToast({ title: 'Snooze failed', message: err.message, tone: 'error' });
+    }
+  }
+
+  async function handleReorderActive(orderedIds) {
+    const previous = tasks;
+    setTasks((current) => {
+      const indexById = new Map(orderedIds.map((id, index) => [id, index]));
+      return current.map((task) =>
+        indexById.has(task.id) ? { ...task, order: indexById.get(task.id) } : task
+      );
+    });
+    try {
+      const updatedTasks = await api.reorderTasks(orderedIds);
+      setTasks(updatedTasks);
+    } catch (err) {
+      setTasks(previous);
+      addToast({ title: 'Could not save order', message: err.message, tone: 'error' });
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.38),transparent_36%),linear-gradient(120deg,rgba(37,99,235,0.28),rgba(168,85,247,0.22),transparent_62%)]" />
@@ -377,16 +479,31 @@ function App() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.4fr]">
-          <TaskForm form={form} setForm={setForm} saving={saving} onSubmit={handleSubmit} />
-          <TaskList
-            loading={loading}
-            tasks={tasks}
-            onToggleComplete={toggleComplete}
-            onDeleteTask={setDeleteCandidate}
-            onEditTask={openEdit}
-          />
-        </div>
+        <TodayFocus
+          task={focusTask}
+          loading={loading}
+          onToggleComplete={toggleComplete}
+          onSnooze={handleSnoozeTask}
+          onEdit={openEdit}
+        />
+
+        <ActiveTaskList
+          loading={loading}
+          tasks={activeTasks}
+          onToggleComplete={toggleComplete}
+          onDeleteTask={setDeleteCandidate}
+          onEditTask={openEdit}
+          onReorder={handleReorderActive}
+        />
+
+        <TaskForm form={form} setForm={setForm} saving={saving} onSubmit={handleSubmit} />
+
+        <CompletedTaskList
+          tasks={completedTasks}
+          onToggleComplete={toggleComplete}
+          onDeleteTask={setDeleteCandidate}
+          onEditTask={openEdit}
+        />
       </section>
       {celebration && <CompletionCelebration />}
       <ToastStack toasts={toasts} onDismiss={(id) => setToasts((current) => current.filter((toast) => toast.id !== id))} />
@@ -841,28 +958,175 @@ function EditTaskModal({ task, onCancel, onSave, saving, error }) {
   );
 }
 
-function TaskList({ loading, tasks, onToggleComplete, onDeleteTask, onEditTask }) {
+function TodayFocus({ task, loading, onToggleComplete, onSnooze, onEdit }) {
+  if (loading) {
+    return (
+      <section className="rounded-lg border border-white/10 bg-white/[0.05] p-6 shadow-glow backdrop-blur">
+        <div className="flex items-center gap-2 text-slate-300">
+          <Loader2 className="animate-spin" size={18} />
+          Loading focus
+        </div>
+      </section>
+    );
+  }
+
+  if (!task) {
+    return (
+      <section className="rounded-lg border border-white/10 bg-white/[0.05] p-6 shadow-glow backdrop-blur">
+        <p className="text-xs uppercase tracking-[0.18em] text-blue-200/80">Today focus</p>
+        <h2 className="mt-2 text-2xl font-semibold text-white">Nothing on the line.</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          Create a task below to set your next focus.
+        </p>
+      </section>
+    );
+  }
+
+  const lastReminderQuote = task.lastReminder ? normalizeQuote(task.lastReminder) : null;
+  const lastReminderLabel = task.lastReminder ? reminderSourceLabel(task.lastReminder) : null;
+  const nextReminderLabel = task.nextReminderAt ? formatReminder(task.nextReminderAt) : null;
+
+  return (
+    <section className="rounded-lg border border-white/10 bg-white/[0.05] p-6 shadow-glow backdrop-blur">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-[0.18em] text-blue-200/80">Today focus</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{task.title}</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-300">
+            <span className="inline-flex items-center gap-2">
+              <Clock3 size={15} className="text-blue-200" />
+              {nextReminderLabel ? `Next nudge ${nextReminderLabel}` : 'No reminder scheduled'}
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <Target size={15} className="text-purple-200" />
+              {nudgeToneLabel(task.nudgeTone)} tone
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {lastReminderQuote?.text && (
+        <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3">
+          <p className="text-sm italic leading-6 text-slate-100">"{lastReminderQuote.text}"</p>
+          <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+            {lastReminderQuote.author} · {lastReminderLabel}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => onToggleComplete(task)}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-white px-4 text-sm font-semibold text-slate-950 transition hover:bg-blue-50"
+        >
+          <Check size={17} />
+          Mark done
+        </button>
+        <button
+          onClick={() => onEdit(task)}
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+        >
+          <Pencil size={16} />
+          Edit
+        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <span className="text-xs uppercase tracking-wide text-slate-400">Snooze</span>
+          {[5, 10, 20].map((minutes) => (
+            <button
+              key={minutes}
+              onClick={() => onSnooze(task.id, minutes)}
+              className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-blue-50 transition hover:bg-white/15"
+            >
+              {minutes}m
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ActiveTaskList({ loading, tasks, onToggleComplete, onDeleteTask, onEditTask, onReorder }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const taskIds = tasks.map((task) => task.id);
+
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = taskIds.indexOf(active.id);
+    const newIndex = taskIds.indexOf(over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const next = arrayMove(taskIds, oldIndex, newIndex);
+    onReorder(next);
+  }
+
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.08] p-5 shadow-glow backdrop-blur">
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-white">Tasks</h2>
-          <p className="text-sm text-slate-400">Your reminders stay here after they fire.</p>
+          <h2 className="text-xl font-semibold text-white">Active tasks</h2>
+          <p className="text-sm text-slate-400">Drag to reorder. The top task drives Today focus.</p>
         </div>
         <CalendarClock className="text-blue-200" size={24} />
       </div>
 
       {loading ? (
-        <div className="flex h-56 items-center justify-center text-slate-300">
+        <div className="flex h-40 items-center justify-center text-slate-300">
           <Loader2 className="mr-2 animate-spin" size={20} />
           Loading tasks
         </div>
       ) : tasks.length === 0 ? (
-        <div className="grid h-56 place-items-center rounded-lg border border-dashed border-white/15 bg-white/[0.04] px-6 text-center text-slate-400">
-          <p>No tasks yet. Create one reminder with a clear time, a useful quote style, and a nudge rhythm that fits.</p>
+        <div className="grid h-40 place-items-center rounded-lg border border-dashed border-white/15 bg-white/[0.04] px-6 text-center text-slate-400">
+          <p>No active tasks. Add one below to set your next focus.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <SortableTaskCard
+                  key={task.id}
+                  task={task}
+                  onToggleComplete={onToggleComplete}
+                  onDeleteTask={onDeleteTask}
+                  onEditTask={onEditTask}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+    </section>
+  );
+}
+
+function CompletedTaskList({ tasks, onToggleComplete, onDeleteTask, onEditTask }) {
+  const [expanded, setExpanded] = useState(false);
+  if (tasks.length === 0) return null;
+
+  return (
+    <section className="rounded-lg border border-white/10 bg-white/[0.04] p-5 shadow-glow backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex w-full items-center justify-between gap-4 text-left"
+      >
+        <div>
+          <h2 className="text-xl font-semibold text-white">Completed</h2>
+          <p className="text-sm text-slate-400">
+            {tasks.length} task{tasks.length === 1 ? '' : 's'} finished.
+          </p>
+        </div>
+        <ChevronDown
+          size={18}
+          className={`text-slate-300 transition-transform ${expanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {expanded && (
+        <div className="mt-4 space-y-3">
           {tasks.map((task) => (
             <TaskCard
               key={task.id}
@@ -878,48 +1142,82 @@ function TaskList({ loading, tasks, onToggleComplete, onDeleteTask, onEditTask }
   );
 }
 
-function TaskCard({ task, onToggleComplete, onDeleteTask, onEditTask }) {
+function SortableTaskCard({ task, onToggleComplete, onDeleteTask, onEditTask }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <TaskCard
+        task={task}
+        onToggleComplete={onToggleComplete}
+        onDeleteTask={onDeleteTask}
+        onEditTask={onEditTask}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
+
+function TaskCard({ task, onToggleComplete, onDeleteTask, onEditTask, dragHandleProps }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <article className="rounded-lg border border-white/10 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3
-              className={`text-lg font-semibold ${
-                task.completed ? 'text-slate-400 line-through' : 'text-white'
-              }`}
+        <div className="flex min-w-0 flex-1 gap-3">
+          {dragHandleProps && (
+            <button
+              type="button"
+              {...dragHandleProps}
+              className="mt-1 inline-flex h-8 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-slate-500 transition hover:bg-white/10 hover:text-slate-200 active:cursor-grabbing"
+              aria-label={`Drag to reorder ${task.title}`}
             >
-              {task.title}
-            </h3>
-            <StatusBadge task={task} />
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-400">
-            <span className="inline-flex items-center gap-2">
-              <Clock3 size={16} />
-              Scheduled {formatReminder(task.reminderAt)}
-            </span>
-          </div>
-          <TaskQuote task={task} compact />
-          <button
-            onClick={() => setExpanded((current) => !current)}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-blue-200 transition hover:bg-white/10"
-          >
-            <ChevronDown
-              size={16}
-              className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
-            />
-            Details
-          </button>
-          {expanded && (
-            <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
-              {task.description && (
-                <p className="mb-3 text-sm leading-6 text-slate-300">{task.description}</p>
-              )}
-              <TaskReminderDetails task={task} />
-            </div>
+              <GripVertical size={16} />
+            </button>
           )}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3
+                className={`text-lg font-semibold ${
+                  task.completed ? 'text-slate-400 line-through' : 'text-white'
+                }`}
+              >
+                {task.title}
+              </h3>
+              <StatusBadge task={task} />
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-400">
+              <span className="inline-flex items-center gap-2">
+                <Clock3 size={16} />
+                Scheduled {formatReminder(task.reminderAt)}
+              </span>
+            </div>
+            <TaskQuote task={task} compact />
+            <button
+              onClick={() => setExpanded((current) => !current)}
+              className="mt-3 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-blue-200 transition hover:bg-white/10"
+            >
+              <ChevronDown
+                size={16}
+                className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+              />
+              Details
+            </button>
+            {expanded && (
+              <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                {task.description && (
+                  <p className="mb-3 text-sm leading-6 text-slate-300">{task.description}</p>
+                )}
+                <TaskReminderDetails task={task} />
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:flex-nowrap">
           <button
