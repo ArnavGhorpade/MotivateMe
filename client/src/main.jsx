@@ -124,6 +124,7 @@ function App() {
     title: '',
     description: '',
     reminderAt: toLocalDateTimeValue(),
+    useNow: true,
     reminderOffsetMinutes: 0,
     repeatIntervalMinutes: 0,
     quotePreference: {
@@ -219,11 +220,15 @@ function App() {
     setSaving(true);
     setError('');
     try {
+      const reminderAt = form.useNow
+        ? new Date().toISOString()
+        : new Date(form.reminderAt).toISOString();
+      const reminderOffsetMinutes = form.useNow ? 0 : form.reminderOffsetMinutes;
       const task = await api.createTask({
         title: form.title,
         description: form.description,
-        reminderAt: new Date(form.reminderAt).toISOString(),
-        reminderOffsetMinutes: form.reminderOffsetMinutes,
+        reminderAt,
+        reminderOffsetMinutes,
         repeatIntervalMinutes: form.repeatIntervalMinutes,
         quotePreference: form.quotePreference,
         nudgeTone: form.nudgeTone
@@ -233,6 +238,7 @@ function App() {
         title: '',
         description: '',
         reminderAt: toLocalDateTimeValue(),
+        useNow: true,
         reminderOffsetMinutes: 0,
         repeatIntervalMinutes: 0,
         quotePreference: {
@@ -519,53 +525,77 @@ function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
       <label className="field-label mt-4" htmlFor={reminderId}>
         Reminder time
       </label>
-      <input
-        id={reminderId}
-        required
-        type="datetime-local"
-        value={form.reminderAt}
-        onChange={(event) =>
-          setForm((current) => ({ ...current, reminderAt: event.target.value }))
-        }
-        className="field-input"
-      />
-
-      <fieldset className="mt-4">
-        <legend className="field-label">Reminder timing</legend>
-        <select
-          value={presetOrCustom(form.reminderOffsetMinutes, [0, 5, 10, 20])}
-          onChange={(event) =>
-            setForm((current) => ({
-              ...current,
-              reminderOffsetMinutes:
-                event.target.value === 'custom' ? 30 : Number(event.target.value)
-            }))
-          }
-          className="field-input"
-        >
-          {reminderOffsets.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {presetOrCustom(form.reminderOffsetMinutes, [0, 5, 10, 20]) === 'custom' && (
+      {form.useNow ? (
+        <div className="field-input flex items-center justify-between gap-3">
+          <span className="text-slate-100">Start now</span>
+          <button
+            type="button"
+            onClick={() => setForm((current) => ({ ...current, useNow: false }))}
+            className="text-sm font-semibold text-blue-200 transition hover:text-blue-100"
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <>
           <input
-            type="number"
-            min="1"
-            max="1440"
-            value={form.reminderOffsetMinutes}
+            id={reminderId}
+            required
+            type="datetime-local"
+            value={form.reminderAt}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, reminderAt: event.target.value }))
+            }
+            className="field-input"
+          />
+          <button
+            type="button"
+            onClick={() => setForm((current) => ({ ...current, useNow: true }))}
+            className="mt-2 text-xs font-semibold text-blue-200 transition hover:text-blue-100"
+          >
+            Use now
+          </button>
+        </>
+      )}
+
+      {!form.useNow && (
+        <fieldset className="mt-4">
+          <legend className="field-label">Reminder timing</legend>
+          <select
+            value={presetOrCustom(form.reminderOffsetMinutes, [0, 5, 10, 20])}
             onChange={(event) =>
               setForm((current) => ({
                 ...current,
-                reminderOffsetMinutes: Number(event.target.value)
+                reminderOffsetMinutes:
+                  event.target.value === 'custom' ? 30 : Number(event.target.value)
               }))
             }
-            className="field-input mt-2"
-            aria-label="Custom minutes before"
-          />
-        )}
-      </fieldset>
+            className="field-input"
+          >
+            {reminderOffsets.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {presetOrCustom(form.reminderOffsetMinutes, [0, 5, 10, 20]) === 'custom' && (
+            <input
+              type="number"
+              min="1"
+              max="1440"
+              value={form.reminderOffsetMinutes}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  reminderOffsetMinutes: Number(event.target.value)
+                }))
+              }
+              className="field-input mt-2"
+              aria-label="Custom minutes before"
+            />
+          )}
+        </fieldset>
+      )}
 
       <fieldset className="mt-4">
         <legend className="field-label">Repeat nudges</legend>
@@ -729,6 +759,7 @@ function EditTaskModal({ task, onCancel, onSave, saving, error }) {
     title: task.title || '',
     description: task.description || '',
     reminderAt: toLocalDateTimeValue(new Date(task.reminderAt)),
+    useNow: false,
     reminderOffsetMinutes: Number.isFinite(task.reminderOffsetMinutes) ? task.reminderOffsetMinutes : 0,
     repeatIntervalMinutes: Number.isFinite(task.repeatIntervalMinutes) ? task.repeatIntervalMinutes : 0,
     quotePreference: {
@@ -740,11 +771,15 @@ function EditTaskModal({ task, onCancel, onSave, saving, error }) {
 
   function handleSubmit(event) {
     event.preventDefault();
+    const reminderAt = form.useNow
+      ? new Date().toISOString()
+      : new Date(form.reminderAt).toISOString();
+    const reminderOffsetMinutes = form.useNow ? 0 : form.reminderOffsetMinutes;
     onSave({
       title: form.title,
       description: form.description,
-      reminderAt: new Date(form.reminderAt).toISOString(),
-      reminderOffsetMinutes: form.reminderOffsetMinutes,
+      reminderAt,
+      reminderOffsetMinutes,
       repeatIntervalMinutes: form.repeatIntervalMinutes,
       quotePreference: form.quotePreference,
       nudgeTone: form.nudgeTone
