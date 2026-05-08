@@ -8,7 +8,7 @@ const quoteModes = ['motivation', 'wisdom', 'random', 'custom'];
 const nudgeTones = ['supportive', 'direct', 'tough'];
 const defaultNudgeTone = 'supportive';
 const reminderOffsets = [0, 5, 10, 20];
-const repeatIntervals = [0, 5, 10, 20];
+const repeatIntervals = [0, 1, 5, 10, 20];
 const snoozeIntervals = [5, 10, 20];
 const maxCustomMinutes = 1440;
 

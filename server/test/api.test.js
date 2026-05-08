@@ -363,6 +363,38 @@ test('PATCH preserves nudgeTone when only quotePreference changes', async () => 
   }
 });
 
+test('accepts repeatIntervalMinutes: 1 as a built-in option', async () => {
+  const server = await withServer();
+  try {
+    const createRes = await fetch(`${server.baseUrl}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'One-minute repeat task',
+        reminderAt: new Date(Date.now() + 600000).toISOString(),
+        repeatIntervalMinutes: 1
+      })
+    });
+    assert.equal(createRes.status, 201);
+    const created = await createRes.json();
+    assert.equal(created.repeatIntervalMinutes, 1);
+
+    const listRes = await fetch(`${server.baseUrl}/api/tasks`);
+    const tasks = await listRes.json();
+    assert.equal(tasks[0].repeatIntervalMinutes, 1);
+
+    const patchRes = await fetch(`${server.baseUrl}/api/tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repeatIntervalMinutes: 1 })
+    });
+    const patched = await patchRes.json();
+    assert.equal(patched.repeatIntervalMinutes, 1);
+  } finally {
+    await server.close();
+  }
+});
+
 test('persists nudgeTone "tough" through create, list, and update', async () => {
   const server = await withServer();
   try {

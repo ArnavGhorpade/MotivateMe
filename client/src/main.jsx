@@ -41,6 +41,7 @@ const reminderOffsets = [
 
 const repeatIntervals = [
   { value: 0, label: 'No repeat' },
+  { value: 1, label: 'Every 1 min' },
   { value: 5, label: 'Every 5 min' },
   { value: 10, label: 'Every 10 min' },
   { value: 20, label: 'Every 20 min' },
@@ -600,7 +601,7 @@ function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
       <fieldset className="mt-4">
         <legend className="field-label">Repeat nudges</legend>
         <select
-          value={presetOrCustom(form.repeatIntervalMinutes, [0, 5, 10, 20])}
+          value={presetOrCustom(form.repeatIntervalMinutes, [0, 1, 5, 10, 20])}
           onChange={(event) =>
             setForm((current) => ({
               ...current,
@@ -616,7 +617,7 @@ function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
             </option>
           ))}
         </select>
-        {presetOrCustom(form.repeatIntervalMinutes, [0, 5, 10, 20]) === 'custom' && (
+        {presetOrCustom(form.repeatIntervalMinutes, [0, 1, 5, 10, 20]) === 'custom' && (
           <input
             type="number"
             min="1"
