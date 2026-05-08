@@ -112,6 +112,7 @@ function App() {
   const [error, setError] = useState('');
   const [toasts, setToasts] = useState([]);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [celebration, setCelebration] = useState(null);
   const [notificationPermission, setNotificationPermission] = useState(() =>
     'Notification' in window ? Notification.permission : 'unavailable'
   );
@@ -244,6 +245,13 @@ function App() {
   async function toggleComplete(task) {
     const updated = await api.updateTask(task.id, { completed: !task.completed });
     setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
+    if (!task.completed && updated.completed) {
+      const id = crypto.randomUUID();
+      setCelebration({ id });
+      window.setTimeout(() => {
+        setCelebration((current) => (current?.id === id ? null : current));
+      }, 2400);
+    }
     addToast({
       title: updated.completed ? 'Task completed' : 'Task reopened',
       message: `"${updated.title}" ${updated.completed ? 'will stop sending reminders.' : 'is active again.'}`,
@@ -357,6 +365,7 @@ function App() {
           />
         </div>
       </section>
+      {celebration && <CompletionCelebration />}
       <ToastStack toasts={toasts} onDismiss={(id) => setToasts((current) => current.filter((toast) => toast.id !== id))} />
       {deleteCandidate && (
         <ConfirmDeleteModal
@@ -366,6 +375,41 @@ function App() {
         />
       )}
     </main>
+  );
+}
+
+function CompletionCelebration() {
+  const pieces = Array.from({ length: 18 }, (_, index) => ({
+    id: index,
+    left: 12 + ((index * 43) % 76),
+    delay: (index % 6) * 0.045,
+    drift: ((index % 5) - 2) * 18,
+    color: ['#60a5fa', '#a78bfa', '#34d399', '#f0abfc'][index % 4]
+  }));
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-40 grid place-items-center px-4">
+      <div className="completion-confetti" aria-hidden="true">
+        {pieces.map((piece) => (
+          <span
+            key={piece.id}
+            style={{
+              '--left': `${piece.left}%`,
+              '--delay': `${piece.delay}s`,
+              '--drift': `${piece.drift}px`,
+              '--color': piece.color
+            }}
+          />
+        ))}
+      </div>
+      <div className="completion-card rounded-lg border border-emerald-300/20 bg-slate-950/90 p-6 text-center shadow-glow backdrop-blur">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-300/25">
+          <CheckCircle2 size={38} strokeWidth={1.8} />
+        </div>
+        <h2 className="mt-4 text-2xl font-semibold text-white">Task completed</h2>
+        <p className="mt-2 text-sm text-slate-300">Nice work — your progress was saved.</p>
+      </div>
+    </div>
   );
 }
 

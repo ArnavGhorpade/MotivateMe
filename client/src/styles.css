@@ -24,3 +24,66 @@
     @apply w-full rounded-lg border border-white/10 bg-slate-950/70 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-blue-300/60 focus:ring-4 focus:ring-blue-400/10;
   }
 }
+
+@layer utilities {
+  .completion-card {
+    animation: completion-card-in 2.35s ease forwards;
+  }
+
+  .completion-confetti {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .completion-confetti span {
+    position: absolute;
+    top: 18%;
+    left: var(--left);
+    width: 6px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--color);
+    opacity: 0;
+    transform: translateY(-12px) translateX(0) rotate(0deg);
+    animation: completion-confetti-fall 1.15s ease-out var(--delay) forwards;
+  }
+
+  @keyframes completion-card-in {
+    0% {
+      opacity: 0;
+      transform: translateY(12px) scale(0.97);
+    }
+    12%,
+    78% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.985);
+    }
+  }
+
+  @keyframes completion-confetti-fall {
+    0% {
+      opacity: 0;
+      transform: translateY(-12px) translateX(0) rotate(0deg);
+    }
+    15% {
+      opacity: 0.9;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(180px) translateX(var(--drift)) rotate(180deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .completion-card,
+    .completion-confetti span {
+      animation-duration: 0.01ms;
+      animation-iteration-count: 1;
+    }
+  }
+}
