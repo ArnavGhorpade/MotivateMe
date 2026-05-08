@@ -3,13 +3,17 @@ import express from 'express';
 import cors from 'cors';
 import { pathToFileURL } from 'node:url';
 import { TaskStore, validateTaskInput } from './storage.js';
+import { JsonTaskRepo } from './repo.js';
 import { ReminderScheduler } from './reminderScheduler.js';
 import { generateContent, listContentTypes, listQuoteOptions } from './content/index.js';
+import { authMiddleware } from './auth.js';
 
-export function createApp({ store = new TaskStore(), scheduler } = {}) {
+export function createApp({ store, repo, scheduler } = {}) {
+  const taskStore = store || new TaskStore();
+  const taskRepo = repo || new JsonTaskRepo(taskStore);
   const app = express();
   const activeClients = new Set();
-  const reminderScheduler = scheduler || new ReminderScheduler(store);
+  const reminderScheduler = scheduler || new ReminderScheduler(taskRepo);
   const allowedOrigins = new Set(
     [
       'http://localhost:5173',
@@ -34,9 +38,13 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
     res.json({ ok: true, contentTypes: listContentTypes(), quoteOptions: listQuoteOptions() });
   });
 
+  // All task routes go through authMiddleware so req.userId is populated.
+  // In AUTH_MODE=off this is a no-op that assigns LOCAL_USER_ID.
+  app.use('/api/tasks', authMiddleware);
+
   app.get('/api/tasks', async (req, res, next) => {
     try {
-      res.json(await store.readAll());
+      res.json(await taskRepo.listForUser(req.userId));
     } catch (error) {
       next(error);
     }
@@ -48,8 +56,22 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
       if (errors.length) {
         return res.status(400).json({ errors });
       }
-      const task = await store.create(req.body);
+      const task = await taskRepo.create(req.userId, req.body);
       return res.status(201).json(task);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  // PUT /api/tasks/order must come before PATCH /api/tasks/:id so the
+  // 'order' literal is not consumed as an :id parameter.
+  app.put('/api/tasks/order', async (req, res, next) => {
+    try {
+      const { tasks, error, status } = await taskRepo.reorder(req.userId, req.body?.order);
+      if (!tasks) {
+        return res.status(status || 400).json({ error });
+      }
+      return res.json(tasks);
     } catch (error) {
       return next(error);
     }
@@ -72,9 +94,9 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
         'remindedAt'
       ];
       const patch = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowed.includes(key)));
-      const task = await store.update(req.params.id, patch);
+      const { task, status } = await taskRepo.update(req.userId, req.params.id, patch);
       if (!task) {
-        return res.status(404).json({ error: 'Task not found.' });
+        return res.status(status).json({ error: 'Task not found.' });
       }
       return res.json(task);
     } catch (error) {
@@ -84,9 +106,9 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
 
   app.delete('/api/tasks/:id', async (req, res, next) => {
     try {
-      const deleted = await store.delete(req.params.id);
+      const { deleted, status } = await taskRepo.delete(req.userId, req.params.id);
       if (!deleted) {
-        return res.status(404).json({ error: 'Task not found.' });
+        return res.status(status).json({ error: 'Task not found.' });
       }
       return res.status(204).send();
     } catch (error) {
@@ -94,23 +116,15 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
     }
   });
 
-  app.put('/api/tasks/order', async (req, res, next) => {
-    try {
-      const { tasks, error } = await store.reorder(req.body?.order);
-      if (!tasks) {
-        return res.status(400).json({ error });
-      }
-      return res.json(tasks);
-    } catch (error) {
-      return next(error);
-    }
-  });
-
   app.post('/api/tasks/:id/snooze', async (req, res, next) => {
     try {
-      const { task, error } = await store.snooze(req.params.id, req.body?.minutes);
+      const { task, error, status } = await taskRepo.snooze(
+        req.userId,
+        req.params.id,
+        req.body?.minutes
+      );
       if (!task) {
-        return res.status(error === 'Task not found.' ? 404 : 400).json({ error });
+        return res.status(status || 400).json({ error });
       }
       return res.json(task);
     } catch (error) {

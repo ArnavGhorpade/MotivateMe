@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { LOCAL_USER_ID } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultPath = path.join(__dirname, 'data', 'tasks.json');
@@ -82,6 +83,7 @@ export class TaskStore {
       .reduce((min, existing) => Math.min(min, existing.order), 0);
     const task = {
       id: crypto.randomUUID(),
+      user_id: input.user_id || LOCAL_USER_ID,
       title: input.title.trim(),
       description: input.description?.trim() || '',
       reminderAt,
@@ -114,6 +116,7 @@ export class TaskStore {
     const fallbackOrder = task.createdAt ? -new Date(task.createdAt).getTime() : 0;
     return {
       ...task,
+      user_id: task.user_id || LOCAL_USER_ID,
       reminderOffsetMinutes,
       repeatIntervalMinutes,
       reminderCount: Number.isInteger(task.reminderCount) ? task.reminderCount : task.remindedAt ? 1 : 0,

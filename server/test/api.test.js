@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createApp } from '../src/index.js';
 import { TaskStore } from '../src/storage.js';
+import { JsonTaskRepo } from '../src/repo.js';
 import { ReminderScheduler } from '../src/reminderScheduler.js';
 import { localQuotes } from '../src/content/quotes.js';
 import { generateNudge, nudgeStageForCount, nudgeTones } from '../src/content/nudges.js';
@@ -140,7 +141,7 @@ test('scheduler repeats unfinished reminders without duplicating the same interv
     });
     await store.update(task.id, { nextReminderAt: new Date(Date.now() - 1000).toISOString() });
 
-    const scheduler = new ReminderScheduler(store);
+    const scheduler = new ReminderScheduler(new JsonTaskRepo(store));
     await scheduler.checkDueTasks();
 
     const [updated] = await store.readAll();
@@ -559,7 +560,7 @@ test('scheduler progresses through quote, micro-start, and identity stages', asy
       nudgeTone: 'direct'
     });
 
-    const scheduler = new ReminderScheduler(store);
+    const scheduler = new ReminderScheduler(new JsonTaskRepo(store));
 
     await store.update(task.id, { nextReminderAt: new Date(Date.now() - 1000).toISOString() });
     await scheduler.checkDueTasks();
@@ -612,7 +613,7 @@ test('first reminder for custom message preserves the user message', async () =>
     });
     await store.update(task.id, { nextReminderAt: new Date(Date.now() - 1000).toISOString() });
 
-    const scheduler = new ReminderScheduler(store);
+    const scheduler = new ReminderScheduler(new JsonTaskRepo(store));
     await scheduler.checkDueTasks();
     let [updated] = await store.readAll();
     assert.equal(updated.lastReminder.text, 'Two pages, then a break.');
@@ -656,5 +657,108 @@ test('rejects invalid task input', async () => {
     assert.equal(invalidTimingRes.status, 400);
   } finally {
     await server.close();
+  }
+});
+
+test('json repo scopes reads to LOCAL_USER_ID and stamps user_id on create', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'motivateme-'));
+  const store = new TaskStore(path.join(dir, 'tasks.json'));
+  const scheduler = { on() {}, start() {}, stop() {} };
+  const app = createApp({ store, scheduler });
+  const server = await new Promise((resolve, reject) => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+    instance.on('error', reject);
+  });
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const { LOCAL_USER_ID } = await import('../src/config.js');
+  try {
+    // Seed a task owned by a different synthetic user directly through the
+    // store. The API must never surface it since req.userId is LOCAL_USER_ID.
+    const stranger = await store.create({
+      user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      title: 'Stranger task',
+      reminderAt: new Date(Date.now() + 600000).toISOString()
+    });
+    assert.equal(stranger.user_id, 'ffffffff-ffff-ffff-ffff-ffffffffffff');
+
+    // Create a task through the API (which uses LOCAL_USER_ID).
+    const createRes = await fetch(`${baseUrl}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Local task',
+        reminderAt: new Date(Date.now() + 600000).toISOString()
+      })
+    });
+    const created = await createRes.json();
+    assert.equal(created.user_id, LOCAL_USER_ID);
+
+    // Listing through the API should hide the stranger task.
+    const listRes = await fetch(`${baseUrl}/api/tasks`);
+    const tasks = await listRes.json();
+    assert.equal(tasks.length, 1);
+    assert.equal(tasks[0].id, created.id);
+
+    // The stranger task must not be patchable or deletable through the API.
+    const patchRes = await fetch(`${baseUrl}/api/tasks/${stranger.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Hijack' })
+    });
+    assert.equal(patchRes.status, 404);
+
+    const deleteRes = await fetch(`${baseUrl}/api/tasks/${stranger.id}`, {
+      method: 'DELETE'
+    });
+    assert.equal(deleteRes.status, 404);
+
+    // The stranger task should still exist in storage untouched.
+    const persisted = (await store.readAll()).find((task) => task.id === stranger.id);
+    assert.equal(persisted.title, 'Stranger task');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('reorder endpoint refuses ids that belong to another user', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'motivateme-'));
+  const store = new TaskStore(path.join(dir, 'tasks.json'));
+  const scheduler = { on() {}, start() {}, stop() {} };
+  const app = createApp({ store, scheduler });
+  const server = await new Promise((resolve, reject) => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+    instance.on('error', reject);
+  });
+  const { port } = server.address();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try {
+    const stranger = await store.create({
+      user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      title: 'Stranger task',
+      reminderAt: new Date(Date.now() + 600000).toISOString()
+    });
+    const localRes = await fetch(`${baseUrl}/api/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Local task',
+        reminderAt: new Date(Date.now() + 600000).toISOString()
+      })
+    });
+    const local = await localRes.json();
+
+    const reorderRes = await fetch(`${baseUrl}/api/tasks/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: [local.id, stranger.id] })
+    });
+    assert.equal(reorderRes.status, 400);
+    const body = await reorderRes.json();
+    assert.ok(body.error);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(dir, { recursive: true, force: true });
   }
 });
