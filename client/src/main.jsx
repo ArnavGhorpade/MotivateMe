@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Clock3,
   Loader2,
+  Pencil,
   Plus,
   Quote,
   Repeat2,
@@ -22,6 +23,12 @@ const quoteModes = [
   { value: 'wisdom', label: 'Wisdom' },
   { value: 'random', label: 'Random' },
   { value: 'custom', label: 'Custom message' }
+];
+
+const nudgeTones = [
+  { value: 'supportive', label: 'Supportive', hint: 'Calm and encouraging.' },
+  { value: 'direct', label: 'Direct', hint: 'Clear and action-oriented.' },
+  { value: 'tough', label: 'Tough', hint: 'Disciplined coach. No-excuses.' }
 ];
 
 const reminderOffsets = [
@@ -70,7 +77,10 @@ const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error('Could not update task.');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.errors?.join(' ') || body.error || 'Could not update task.');
+    }
     return res.json();
   },
   async deleteTask(id) {
@@ -78,15 +88,6 @@ const api = {
       method: 'DELETE'
     });
     if (!res.ok) throw new Error('Could not delete task.');
-  },
-  async snoozeTask(id, minutes) {
-    const res = await fetch(apiUrl(`/api/tasks/${id}/snooze`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ minutes })
-    });
-    if (!res.ok) throw new Error('Could not snooze task.');
-    return res.json();
   }
 };
 
@@ -112,6 +113,9 @@ function App() {
   const [error, setError] = useState('');
   const [toasts, setToasts] = useState([]);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [editCandidate, setEditCandidate] = useState(null);
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const [celebration, setCelebration] = useState(null);
   const [notificationPermission, setNotificationPermission] = useState(() =>
     'Notification' in window ? Notification.permission : 'unavailable'
@@ -125,7 +129,8 @@ function App() {
     quotePreference: {
       mode: 'motivation',
       customMessage: '',
-    }
+    },
+    nudgeTone: 'supportive'
   });
 
   function addToast({ title, message, tone = 'info' }) {
@@ -215,8 +220,13 @@ function App() {
     setError('');
     try {
       const task = await api.createTask({
-        ...form,
-        reminderAt: new Date(form.reminderAt).toISOString()
+        title: form.title,
+        description: form.description,
+        reminderAt: new Date(form.reminderAt).toISOString(),
+        reminderOffsetMinutes: form.reminderOffsetMinutes,
+        repeatIntervalMinutes: form.repeatIntervalMinutes,
+        quotePreference: form.quotePreference,
+        nudgeTone: form.nudgeTone
       });
       setTasks((current) => [task, ...current]);
       setForm({
@@ -228,7 +238,8 @@ function App() {
         quotePreference: {
           mode: 'motivation',
           customMessage: '',
-        }
+        },
+        nudgeTone: 'supportive'
       });
       addToast({
         title: 'Task created',
@@ -282,25 +293,35 @@ function App() {
     }
   }
 
-  async function snoozeTask(taskId, minutes) {
+  function openEdit(task) {
+    setEditError('');
+    setEditCandidate(task);
+  }
+
+  function closeEdit() {
+    if (editSaving) return;
+    setEditCandidate(null);
+    setEditError('');
+  }
+
+  async function handleEditSave(payload) {
+    if (!editCandidate) return;
+    setEditSaving(true);
+    setEditError('');
     try {
-      const updated = await api.snoozeTask(taskId, minutes);
-      setTasks((current) => current.map((task) => (task.id === taskId ? updated : task)));
-      setBanner((current) =>
-        current?.taskId === taskId ? { ...current, followUpAt: updated.nextReminderAt } : current
-      );
+      const updated = await api.updateTask(editCandidate.id, payload);
+      setTasks((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setBanner((current) => (current?.taskId === updated.id ? null : current));
+      setEditCandidate(null);
       addToast({
-        title: `Snoozed ${minutes} minutes`,
-        message: `Next reminder: ${formatReminder(updated.nextReminderAt)}.`,
+        title: 'Task updated',
+        message: `"${updated.title}" was saved.`,
         tone: 'success'
       });
     } catch (err) {
-      setError(err.message);
-      addToast({
-        title: 'Snooze failed',
-        message: err.message,
-        tone: 'error'
-      });
+      setEditError(err.message);
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -341,13 +362,7 @@ function App() {
           </button>
         </div>
 
-        {banner && (
-          <ReminderBanner
-            reminder={banner}
-            onClose={() => setBanner(null)}
-            onSnooze={(minutes) => snoozeTask(banner.taskId, minutes)}
-          />
-        )}
+        {banner && <ReminderBanner reminder={banner} onClose={() => setBanner(null)} />}
 
         {error && (
           <div className="rounded-lg border border-rose-400/30 bg-rose-500/15 px-4 py-3 text-sm text-rose-100">
@@ -362,6 +377,7 @@ function App() {
             tasks={tasks}
             onToggleComplete={toggleComplete}
             onDeleteTask={setDeleteCandidate}
+            onEditTask={openEdit}
           />
         </div>
       </section>
@@ -372,6 +388,16 @@ function App() {
           task={deleteCandidate}
           onCancel={() => setDeleteCandidate(null)}
           onConfirm={() => confirmDeleteTask(deleteCandidate)}
+        />
+      )}
+      {editCandidate && (
+        <EditTaskModal
+          key={editCandidate.id}
+          task={editCandidate}
+          onCancel={closeEdit}
+          onSave={handleEditSave}
+          saving={editSaving}
+          error={editError}
         />
       )}
     </main>
@@ -425,8 +451,10 @@ function StatCard({ icon, label, value }) {
   );
 }
 
-function ReminderBanner({ reminder, onClose, onSnooze }) {
+function ReminderBanner({ reminder, onClose }) {
   const quote = normalizeQuote(reminder.quote);
+  const sourceLabel = reminderSourceLabel(reminder.quote);
+  const toneLabel = nudgeToneLabel(reminder.nudgeTone || quote.tone);
   return (
     <div className="rounded-lg border border-blue-300/30 bg-blue-500/15 p-4 shadow-glow backdrop-blur">
       <div className="flex items-start justify-between gap-4">
@@ -439,19 +467,8 @@ function ReminderBanner({ reminder, onClose, onSnooze }) {
             <p className="mt-1 text-lg leading-7 text-white">{quote.text}</p>
             <p className="mt-2 text-sm text-slate-300">- {quote.author}</p>
             <p className="mt-2 text-xs uppercase tracking-wide text-slate-400">
-              {quote.type} · curated local quote
+              {sourceLabel} · {toneLabel} tone
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[5, 10, 20].map((minutes) => (
-                <button
-                  key={minutes}
-                  onClick={() => onSnooze(minutes)}
-                  className="rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-semibold text-blue-50 transition hover:bg-white/20"
-                >
-                  Snooze {minutes}m
-                </button>
-              ))}
-            </div>
           </div>
         </div>
         <button
@@ -466,27 +483,18 @@ function ReminderBanner({ reminder, onClose, onSnooze }) {
   );
 }
 
-function TaskForm({ form, setForm, saving, onSubmit }) {
+function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
+  const titleId = `${idPrefix}-title`;
+  const descId = `${idPrefix}-description`;
+  const reminderId = `${idPrefix}-reminderAt`;
+  const customMsgId = `${idPrefix}-customMessage`;
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-lg border border-white/10 bg-white/[0.08] p-5 shadow-glow backdrop-blur"
-    >
-      <div className="mb-5 flex items-center gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-slate-950">
-          <Target size={20} />
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold text-white">Create task</h2>
-          <p className="text-sm text-slate-400">Give your future self a clear next move.</p>
-        </div>
-      </div>
-
-      <label className="field-label" htmlFor="title">
+    <>
+      <label className="field-label" htmlFor={titleId}>
         Title
       </label>
       <input
-        id="title"
+        id={titleId}
         required
         value={form.title}
         onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
@@ -494,11 +502,11 @@ function TaskForm({ form, setForm, saving, onSubmit }) {
         className="field-input"
       />
 
-      <label className="field-label mt-4" htmlFor="description">
+      <label className="field-label mt-4" htmlFor={descId}>
         Description
       </label>
       <textarea
-        id="description"
+        id={descId}
         rows="4"
         value={form.description}
         onChange={(event) =>
@@ -508,11 +516,11 @@ function TaskForm({ form, setForm, saving, onSubmit }) {
         className="field-input resize-none"
       />
 
-      <label className="field-label mt-4" htmlFor="reminderAt">
+      <label className="field-label mt-4" htmlFor={reminderId}>
         Reminder time
       </label>
       <input
-        id="reminderAt"
+        id={reminderId}
         required
         type="datetime-local"
         value={form.reminderAt}
@@ -629,11 +637,11 @@ function TaskForm({ form, setForm, saving, onSubmit }) {
 
       {form.quotePreference.mode === 'custom' && (
         <>
-          <label className="field-label mt-4" htmlFor="customMessage">
+          <label className="field-label mt-4" htmlFor={customMsgId}>
             Custom message
           </label>
           <textarea
-            id="customMessage"
+            id={customMsgId}
             required
             rows="3"
             value={form.quotePreference.customMessage}
@@ -652,6 +660,59 @@ function TaskForm({ form, setForm, saving, onSubmit }) {
         </>
       )}
 
+      <fieldset className="mt-4">
+        <legend className="field-label">Nudge tone</legend>
+        <p className="mb-2 text-xs text-slate-400">
+          Sets the tone of repeat nudges if the task stays incomplete.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {nudgeTones.map((tone) => {
+            const active = form.nudgeTone === tone.value;
+            return (
+              <button
+                key={tone.value}
+                type="button"
+                onClick={() =>
+                  setForm((current) => ({ ...current, nudgeTone: tone.value }))
+                }
+                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                  active
+                    ? 'border-blue-300/60 bg-blue-400/20 text-white'
+                    : 'border-white/10 bg-slate-950/40 text-slate-300 hover:bg-white/10'
+                }`}
+                aria-pressed={active}
+              >
+                {tone.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          {nudgeTones.find((tone) => tone.value === form.nudgeTone)?.hint}
+        </p>
+      </fieldset>
+    </>
+  );
+}
+
+function TaskForm({ form, setForm, saving, onSubmit }) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="rounded-lg border border-white/10 bg-white/[0.08] p-5 shadow-glow backdrop-blur"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <div className="grid h-10 w-10 place-items-center rounded-lg bg-white text-slate-950">
+          <Target size={20} />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-white">Create task</h2>
+          <p className="text-sm text-slate-400">Give your future self a clear next move.</p>
+        </div>
+      </div>
+
+      <TaskFormFields form={form} setForm={setForm} idPrefix="create" />
+
       <button
         disabled={saving}
         className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:scale-[1.01] hover:from-blue-400 hover:to-purple-400 disabled:cursor-not-allowed disabled:opacity-70"
@@ -663,7 +724,88 @@ function TaskForm({ form, setForm, saving, onSubmit }) {
   );
 }
 
-function TaskList({ loading, tasks, onToggleComplete, onDeleteTask }) {
+function EditTaskModal({ task, onCancel, onSave, saving, error }) {
+  const [form, setForm] = useState(() => ({
+    title: task.title || '',
+    description: task.description || '',
+    reminderAt: toLocalDateTimeValue(new Date(task.reminderAt)),
+    reminderOffsetMinutes: Number.isFinite(task.reminderOffsetMinutes) ? task.reminderOffsetMinutes : 0,
+    repeatIntervalMinutes: Number.isFinite(task.repeatIntervalMinutes) ? task.repeatIntervalMinutes : 0,
+    quotePreference: {
+      mode: task.quotePreference?.mode || 'motivation',
+      customMessage: task.quotePreference?.customMessage || ''
+    },
+    nudgeTone: task.nudgeTone || 'supportive'
+  }));
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSave({
+      title: form.title,
+      description: form.description,
+      reminderAt: new Date(form.reminderAt).toISOString(),
+      reminderOffsetMinutes: form.reminderOffsetMinutes,
+      repeatIntervalMinutes: form.repeatIntervalMinutes,
+      quotePreference: form.quotePreference,
+      nudgeTone: form.nudgeTone
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-950/75 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-lg border border-white/10 bg-slate-900 p-5 shadow-glow">
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white text-slate-950">
+              <Pencil size={19} />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Edit task</h2>
+              <p className="text-sm text-slate-400">Update the reminder details below.</p>
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            type="button"
+            className="rounded-lg p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+            aria-label="Close edit dialog"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-sm text-rose-100">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <TaskFormFields form={form} setForm={setForm} idPrefix={`edit-${task.id}`} />
+
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition hover:from-blue-400 hover:to-purple-400 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {saving ? <Loader2 className="animate-spin" size={15} /> : <Check size={15} />}
+              Save changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function TaskList({ loading, tasks, onToggleComplete, onDeleteTask, onEditTask }) {
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.08] p-5 shadow-glow backdrop-blur">
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -691,6 +833,7 @@ function TaskList({ loading, tasks, onToggleComplete, onDeleteTask }) {
               task={task}
               onToggleComplete={onToggleComplete}
               onDeleteTask={onDeleteTask}
+              onEditTask={onEditTask}
             />
           ))}
         </div>
@@ -699,7 +842,7 @@ function TaskList({ loading, tasks, onToggleComplete, onDeleteTask }) {
   );
 }
 
-function TaskCard({ task, onToggleComplete, onDeleteTask }) {
+function TaskCard({ task, onToggleComplete, onDeleteTask, onEditTask }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -742,7 +885,7 @@ function TaskCard({ task, onToggleComplete, onDeleteTask }) {
             </div>
           )}
         </div>
-        <div className="flex shrink-0 gap-2 sm:flex-col">
+        <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col sm:flex-nowrap">
           <button
             onClick={() => onToggleComplete(task)}
             className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition ${
@@ -753,6 +896,13 @@ function TaskCard({ task, onToggleComplete, onDeleteTask }) {
           >
             <Check size={17} />
             {task.completed ? 'Completed' : 'Mark done'}
+          </button>
+          <button
+            onClick={() => onEditTask(task)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+          >
+            <Pencil size={16} />
+            Edit
           </button>
           <button
             onClick={() => onDeleteTask(task)}
@@ -831,26 +981,28 @@ function ConfirmDeleteModal({ task, onCancel, onConfirm }) {
 }
 
 function TaskQuote({ task, compact = false }) {
-  const quote = normalizeQuote(
+  const seed =
     task.lastReminder ||
-      (task.quotePreference?.mode === 'custom'
-        ? {
-            text: task.quotePreference.customMessage,
-            author: 'You',
-            type: 'custom',
-            source: 'custom'
-          }
-        : null)
-  );
+    (task.quotePreference?.mode === 'custom'
+      ? {
+          text: task.quotePreference.customMessage,
+          author: 'You',
+          type: 'custom',
+          source: 'custom'
+        }
+      : null);
+  const quote = normalizeQuote(seed);
 
   if (!quote.text) {
     return (
       <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-slate-400">
         <Quote size={15} />
-        {quoteModeLabel(task.quotePreference?.mode)} reminder
+        {quoteModeLabel(task.quotePreference?.mode)} reminder · {nudgeToneLabel(task.nudgeTone)} tone
       </div>
     );
   }
+
+  const sourceLabel = task.lastReminder ? reminderSourceLabel(task.lastReminder) : 'Custom message';
 
   return (
     <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -860,7 +1012,7 @@ function TaskQuote({ task, compact = false }) {
       </div>
       {!compact && (
         <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
-          {quote.author} · {quote.type}
+          {quote.author} · {sourceLabel}
         </div>
       )}
     </div>
@@ -868,6 +1020,9 @@ function TaskQuote({ task, compact = false }) {
 }
 
 function TaskReminderDetails({ task }) {
+  const lastReminderLabel = task.lastReminder
+    ? reminderSourceLabel(task.lastReminder)
+    : 'No reminder sent yet';
   return (
     <div className="grid gap-2 text-sm text-slate-300 md:grid-cols-2">
       <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -895,14 +1050,22 @@ function TaskReminderDetails({ task }) {
       <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
         <div className="flex items-center gap-2 text-slate-400">
           <Quote size={15} className="text-blue-200" />
-          Quote
+          First reminder style
         </div>
         <p className="mt-1 font-medium text-slate-100">{quoteModeLabel(task.quotePreference?.mode)}</p>
         <p className="text-xs text-slate-500">
-          {normalizeQuote(task.lastReminder).type || task.quotePreference?.mode || 'motivation'}
+          Last sent: {lastReminderLabel}
         </p>
       </div>
       <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+        <div className="flex items-center gap-2 text-slate-400">
+          <Target size={15} className="text-purple-200" />
+          Nudge tone
+        </div>
+        <p className="mt-1 font-medium text-slate-100">{nudgeToneLabel(task.nudgeTone)}</p>
+        <p className="text-xs text-slate-500">Used for repeat nudges</p>
+      </div>
+      <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 md:col-span-2">
         <div className="flex items-center gap-2 text-slate-400">
           <CheckCircle2 size={15} className="text-emerald-200" />
           Sent
@@ -937,13 +1100,32 @@ function StatusBadge({ task }) {
 createRoot(document.getElementById('root')).render(<App />);
 
 function normalizeQuote(quote) {
-  if (!quote) return { text: '', author: '', type: '', source: '' };
+  if (!quote) {
+    return { text: '', author: '', type: '', source: '', tone: '', stage: '', sourceLabel: '', toneLabel: '' };
+  }
   return {
     text: quote.text || quote.content || '',
     author: quote.author || 'Unknown',
     type: quote.type || 'motivation',
-    source: quote.source || 'local'
+    source: quote.source || 'local',
+    tone: quote.tone || '',
+    stage: quote.stage || '',
+    sourceLabel: quote.sourceLabel || '',
+    toneLabel: quote.toneLabel || ''
   };
+}
+
+function nudgeToneLabel(tone) {
+  return nudgeTones.find((item) => item.value === tone)?.label || 'Supportive';
+}
+
+function reminderSourceLabel(quote) {
+  const normalized = normalizeQuote(quote);
+  if (normalized.sourceLabel) return normalized.sourceLabel;
+  if (normalized.source === 'custom' || normalized.type === 'custom') return 'Custom message';
+  if (normalized.source === 'nudge' && normalized.stage === 'identity') return 'Identity nudge';
+  if (normalized.source === 'nudge' && normalized.stage === 'micro-start') return 'Micro-start nudge';
+  return 'Curated local quote';
 }
 
 function quoteModeLabel(mode = 'motivation') {

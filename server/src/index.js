@@ -66,6 +66,7 @@ export function createApp({ store = new TaskStore(), scheduler } = {}) {
         'nextReminderAt',
         'reminderCount',
         'quotePreference',
+        'nudgeTone',
         'lastReminder',
         'completed',
         'remindedAt'

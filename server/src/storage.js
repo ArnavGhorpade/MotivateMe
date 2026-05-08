@@ -5,10 +5,18 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultPath = path.join(__dirname, 'data', 'tasks.json');
 const quoteModes = ['motivation', 'wisdom', 'random', 'custom'];
+const nudgeTones = ['supportive', 'direct', 'tough'];
+const defaultNudgeTone = 'supportive';
 const reminderOffsets = [0, 5, 10, 20];
 const repeatIntervals = [0, 5, 10, 20];
 const snoozeIntervals = [5, 10, 20];
 const maxCustomMinutes = 1440;
+
+export { nudgeTones, defaultNudgeTone };
+
+function normalizeNudgeTone(value) {
+  return nudgeTones.includes(value) ? value : defaultNudgeTone;
+}
 
 function normalizeMinutes(value, allowed, fallback = 0) {
   const minutes = Number(value);
@@ -79,6 +87,7 @@ export class TaskStore {
       nextReminderAt: calculateNextReminderAt(reminderAt, reminderOffsetMinutes),
       reminderCount: 0,
       quotePreference: normalizeQuotePreference(input.quotePreference),
+      nudgeTone: normalizeNudgeTone(input.nudgeTone),
       lastReminder: null,
       completed: false,
       remindedAt: null,
@@ -104,7 +113,8 @@ export class TaskStore {
       repeatIntervalMinutes,
       reminderCount: Number.isInteger(task.reminderCount) ? task.reminderCount : task.remindedAt ? 1 : 0,
       nextReminderAt: completed ? null : task.nextReminderAt ?? fallbackNextReminderAt,
-      quotePreference: normalizeQuotePreference(task.quotePreference)
+      quotePreference: normalizeQuotePreference(task.quotePreference),
+      nudgeTone: normalizeNudgeTone(task.nudgeTone)
     };
   }
 
@@ -121,12 +131,22 @@ export class TaskStore {
       updatedAt: new Date().toISOString()
     };
 
-    if (patch.reminderAt || patch.reminderOffsetMinutes !== undefined) {
-      updated.reminderAt = patch.reminderAt ? new Date(patch.reminderAt).toISOString() : current.reminderAt;
-      updated.reminderOffsetMinutes = normalizeCustomMinutes(
-        patch.reminderOffsetMinutes ?? current.reminderOffsetMinutes,
-        reminderOffsets
-      );
+    const patchedReminderAt = patch.reminderAt ? new Date(patch.reminderAt).toISOString() : null;
+    const patchedOffset =
+      patch.reminderOffsetMinutes !== undefined
+        ? normalizeCustomMinutes(patch.reminderOffsetMinutes, reminderOffsets)
+        : null;
+    const reminderAtChanged = patchedReminderAt !== null && patchedReminderAt !== current.reminderAt;
+    const offsetChanged = patchedOffset !== null && patchedOffset !== current.reminderOffsetMinutes;
+
+    if (patchedReminderAt) {
+      updated.reminderAt = patchedReminderAt;
+    }
+    if (patchedOffset !== null) {
+      updated.reminderOffsetMinutes = patchedOffset;
+    }
+
+    if (reminderAtChanged || offsetChanged) {
       updated.nextReminderAt = updated.completed
         ? null
         : calculateNextReminderAt(updated.reminderAt, updated.reminderOffsetMinutes);
@@ -141,6 +161,10 @@ export class TaskStore {
 
     if (patch.quotePreference) {
       updated.quotePreference = normalizeQuotePreference(patch.quotePreference);
+    }
+
+    if (patch.nudgeTone !== undefined) {
+      updated.nudgeTone = normalizeNudgeTone(patch.nudgeTone);
     }
 
     if (patch.completed === true) {
@@ -201,6 +225,9 @@ export function validateTaskInput(input) {
     !isValidCustomMinutes(input.repeatIntervalMinutes, repeatIntervals)
   ) {
     errors.push('Repeat interval must be 0, 5, 10, 20, or a custom value from 1 to 1440 minutes.');
+  }
+  if (input?.nudgeTone !== undefined && !nudgeTones.includes(input.nudgeTone)) {
+    errors.push('Nudge tone must be supportive, direct, or tough.');
   }
   return errors;
 }

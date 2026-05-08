@@ -1,5 +1,36 @@
 import { EventEmitter } from 'node:events';
 import { generateContent } from './content/index.js';
+import { generateNudge, nudgeStageForCount } from './content/nudges.js';
+
+const initialSourceLabels = {
+  custom: 'Custom message',
+  motivation: 'Curated local quote',
+  wisdom: 'Curated local quote'
+};
+
+const toneLabels = {
+  supportive: 'Supportive nudge',
+  direct: 'Direct nudge',
+  tough: 'Tough nudge'
+};
+
+async function buildReminderQuote(task) {
+  const tone = task.nudgeTone || 'supportive';
+  const stage = nudgeStageForCount(task.reminderCount);
+
+  if (stage === 'initial') {
+    const quote = await generateContent('quote', { task });
+    return {
+      ...quote,
+      tone,
+      stage: 'initial',
+      sourceLabel: initialSourceLabels[quote.source] || initialSourceLabels[quote.type] || 'Curated local quote',
+      toneLabel: toneLabels[tone]
+    };
+  }
+
+  return generateNudge({ stage, tone, title: task.title });
+}
 
 export class ReminderScheduler extends EventEmitter {
   constructor(store, { intervalMs = 15000, lookbackMs = 60000 } = {}) {
@@ -32,7 +63,7 @@ export class ReminderScheduler extends EventEmitter {
 
     for (const task of dueTasks) {
       try {
-        const quote = await generateContent('quote', { task });
+        const quote = await buildReminderQuote(task);
         const reminder = {
           id: crypto.randomUUID(),
           taskId: task.id,
@@ -40,6 +71,8 @@ export class ReminderScheduler extends EventEmitter {
           reminderAt: task.reminderAt,
           nextReminderAt: task.nextReminderAt,
           reminderCount: (task.reminderCount || 0) + 1,
+          nudgeTone: task.nudgeTone || 'supportive',
+          nudgeStage: quote.stage,
           quote,
           deliveredAt: new Date().toISOString()
         };

@@ -153,6 +153,24 @@ Local fallback behavior:
 - `custom`: uses the user's message directly with author `You`.
 - Quotes are resolved locally. Custom messages use the user's message directly with author `You`.
 
+## Progressive Nudges and Tone
+
+Each task carries a `nudgeTone`: `supportive`, `direct`, or `tough`. The default is `supportive`. The tone shapes the language of repeat nudges so the same task can feel calm and encouraging, clear and action-oriented, or disciplined and no-excuses depending on what the user asked for.
+
+- `supportive`: low-pressure encouragement. Reduces friction.
+- `direct`: clear, action-oriented language. No filler.
+- `tough`: firm and uncomfortable, like a disciplined coach. Tough nudges criticize avoidance, never the user. They contain no profanity, insults, personal attacks, or references to sensitive traits, mental health, body image, or personal worth.
+
+Repeat reminders progress through three stages based on `reminderCount`:
+
+1. **Initial reminder** (`reminderCount` is 0 going in): uses the selected quote preference. Motivation, wisdom, random, or the user's custom message.
+2. **Micro-start nudge** (after 1 reminder has fired): a short "do two minutes" nudge in the selected tone, designed to make starting feel easy and immediate.
+3. **Identity nudge** (after 2+ reminders have fired): a follow-through nudge in the selected tone, focused on consistency, momentum, and the kind of person who follows through.
+
+Each `lastReminder` stores `text`, `author`, `type` (`motivation`/`wisdom`/`custom`/`micro-start`/`identity`), `source` (`local`/`custom`/`nudge`), `tone`, `stage`, and human-readable `sourceLabel` and `toneLabel` fields so the UI can show, for example, "Curated local quote" or "Micro-start nudge · Direct tone" without rebuilding the labels.
+
+Custom message behavior: the first reminder uses the user's custom message verbatim. Repeat reminders switch to progressive nudges in the selected tone, since holding the same custom line for many repeats does not push the task forward. If you want every reminder to use the exact custom phrase, set the repeat interval to "No repeat" so only the first reminder fires.
+
 ## Reminder Controls
 
 Each task stores:
@@ -185,6 +203,8 @@ Manual checklist:
 - Choose a custom reminder timing value and confirm validation works.
 - Choose a repeat interval or custom repeat value and confirm it appears in task details.
 - Select Motivation, Wisdom, Random, or Custom message and confirm it appears in the task card.
+- Pick a nudge tone (Supportive, Direct, or Tough) and confirm it shows in the task details.
+- For an unfinished task with repeats enabled, confirm the second reminder is a micro-start nudge in the selected tone, and the third+ are identity nudges.
 - Mark it complete and confirm the completed status.
 - Delete a task and confirm it disappears after confirmation.
 - Add another task due soon and leave it pending.

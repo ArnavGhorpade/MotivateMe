@@ -7,20 +7,25 @@
     "reminderOffsetMinutes": 5,
     "repeatIntervalMinutes": 1,
     "nextReminderAt": null,
-    "reminderCount": 13,
+    "reminderCount": 14,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "lastReminder": {
-      "text": "Well begun is half done.",
-      "author": "Aristotle",
-      "type": "motivation",
-      "source": "local"
+      "text": "Don't let Complete Foundation Module sit longer. Take control and start now.",
+      "author": "MotivateMe",
+      "type": "identity",
+      "source": "nudge",
+      "tone": "tough",
+      "stage": "identity",
+      "sourceLabel": "Identity nudge",
+      "toneLabel": "Tough nudge"
     },
     "completed": true,
-    "remindedAt": "2026-04-29T21:42:21.734Z",
+    "remindedAt": "2026-05-08T18:37:25.284Z",
     "createdAt": "2026-04-29T21:29:40.525Z",
-    "updatedAt": "2026-04-29T21:42:45.661Z"
+    "updatedAt": "2026-05-08T18:37:29.961Z",
+    "nudgeTone": "tough"
   }
 ]
