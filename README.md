@@ -54,7 +54,32 @@ Create `client/.env.local` only if your local backend is not on `http://localhos
 VITE_API_URL=http://localhost:4000
 ```
 
-MotivateMe works entirely from local task storage and the curated quote library.
+MotivateMe works entirely from local task storage and the curated quote library by default. The Supabase migration is incremental — see [Storage backends](#storage-backends).
+
+## Storage backends
+
+The server can read and write tasks from two backends, selected by the `DATA_BACKEND` env var. The default keeps every existing local workflow unchanged.
+
+| `DATA_BACKEND` | Storage | Required env | When to use |
+|---|---|---|---|
+| `json` *(default)* | `server/src/data/tasks.json` via `JsonTaskRepo` | none | Local development, CI, demos. No DB needed. |
+| `supabase` | Postgres via `SupabaseTaskRepo` (service-role client) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Production on Render once a Supabase project exists. |
+
+Both repos implement the same surface (`listForUser`, `create`, `update`, `delete`, `snooze`, `reorder`, `listAllDue`, `applyReminderResult`) so the route layer is unaware of which backend is active.
+
+### Phase 3 environment variables (server)
+
+| Variable | Required when | Purpose |
+|---|---|---|
+| `DATA_BACKEND` | always (defaults to `json`) | Selects the repo implementation. |
+| `AUTH_MODE` | always (defaults to `off`) | Reserved for phase 5; in `off` mode every request is treated as `LOCAL_USER_ID`. |
+| `LOCAL_USER_ID` | optional | Overrides the synthetic local user uuid used in `json` mode. |
+| `SUPABASE_URL` | `DATA_BACKEND=supabase` | `https://<project>.supabase.co`. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `DATA_BACKEND=supabase` | Server-only. Bypasses RLS. **Never send to the browser.** |
+
+Apply `server/supabase/schema.sql` to your Supabase project before flipping `DATA_BACKEND=supabase`. With the wrong combination of env vars the server fails fast on startup with a clear message.
+
+Service-role key safety: the key is only read on the backend, only used for repo queries, and never imported into any frontend file. Treat it like a database password — rotate it from the Supabase dashboard if it leaks.
 
 ## Run The App
 

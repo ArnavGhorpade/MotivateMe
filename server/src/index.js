@@ -4,13 +4,33 @@ import cors from 'cors';
 import { pathToFileURL } from 'node:url';
 import { TaskStore, validateTaskInput } from './storage.js';
 import { JsonTaskRepo } from './repo.js';
+import { SupabaseTaskRepo } from './supabaseRepo.js';
 import { ReminderScheduler } from './reminderScheduler.js';
 import { generateContent, listContentTypes, listQuoteOptions } from './content/index.js';
 import { authMiddleware } from './auth.js';
+import {
+  DATA_BACKEND,
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  validateBackendConfig
+} from './config.js';
+
+function buildDefaultRepo() {
+  validateBackendConfig();
+  if (DATA_BACKEND === 'supabase') {
+    return new SupabaseTaskRepo({
+      url: SUPABASE_URL,
+      serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY
+    });
+  }
+  return new JsonTaskRepo(new TaskStore());
+}
 
 export function createApp({ store, repo, scheduler } = {}) {
-  const taskStore = store || new TaskStore();
-  const taskRepo = repo || new JsonTaskRepo(taskStore);
+  let taskRepo = repo;
+  if (!taskRepo) {
+    taskRepo = store ? new JsonTaskRepo(store) : buildDefaultRepo();
+  }
   const app = express();
   const activeClients = new Set();
   const reminderScheduler = scheduler || new ReminderScheduler(taskRepo);

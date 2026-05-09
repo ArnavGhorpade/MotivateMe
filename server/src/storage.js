@@ -47,6 +47,97 @@ export function calculateNextReminderAt(reminderAt, reminderOffsetMinutes = 0) {
   return new Date(scheduled - reminderOffsetMinutes * 60 * 1000).toISOString();
 }
 
+// Pure helpers extracted so JsonTaskRepo (file-backed) and SupabaseTaskRepo
+// (Postgres-backed) share the same normalization and reset semantics. The
+// repos differ only in how they read/write rows.
+
+export function buildNewTask(input, existingTasks = []) {
+  const now = new Date().toISOString();
+  const reminderOffsetMinutes = normalizeCustomMinutes(input.reminderOffsetMinutes, reminderOffsets);
+  const repeatIntervalMinutes = normalizeCustomMinutes(input.repeatIntervalMinutes, repeatIntervals);
+  const reminderAt = new Date(input.reminderAt).toISOString();
+  const minActiveOrder = existingTasks
+    .filter((existing) => !existing.completed && Number.isFinite(existing.order))
+    .reduce((min, existing) => Math.min(min, existing.order), 0);
+  return {
+    id: crypto.randomUUID(),
+    user_id: input.user_id || LOCAL_USER_ID,
+    title: input.title.trim(),
+    description: input.description?.trim() || '',
+    reminderAt,
+    reminderOffsetMinutes,
+    repeatIntervalMinutes,
+    nextReminderAt: calculateNextReminderAt(reminderAt, reminderOffsetMinutes),
+    reminderCount: 0,
+    quotePreference: normalizeQuotePreference(input.quotePreference),
+    nudgeTone: normalizeNudgeTone(input.nudgeTone),
+    lastReminder: null,
+    completed: false,
+    remindedAt: null,
+    order: minActiveOrder - 1,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export function applyTaskUpdate(current, patch) {
+  const updated = {
+    ...current,
+    ...patch,
+    id: current.id,
+    user_id: current.user_id,
+    updatedAt: new Date().toISOString()
+  };
+
+  const patchedReminderAt = patch.reminderAt ? new Date(patch.reminderAt).toISOString() : null;
+  const patchedOffset =
+    patch.reminderOffsetMinutes !== undefined
+      ? normalizeCustomMinutes(patch.reminderOffsetMinutes, reminderOffsets)
+      : null;
+  const reminderAtChanged = patchedReminderAt !== null && patchedReminderAt !== current.reminderAt;
+  const offsetChanged = patchedOffset !== null && patchedOffset !== current.reminderOffsetMinutes;
+
+  if (patchedReminderAt) {
+    updated.reminderAt = patchedReminderAt;
+  }
+  if (patchedOffset !== null) {
+    updated.reminderOffsetMinutes = patchedOffset;
+  }
+
+  if (reminderAtChanged || offsetChanged) {
+    updated.nextReminderAt = updated.completed
+      ? null
+      : calculateNextReminderAt(updated.reminderAt, updated.reminderOffsetMinutes);
+    updated.reminderCount = 0;
+    updated.remindedAt = null;
+    updated.lastReminder = null;
+  }
+
+  if (patch.repeatIntervalMinutes !== undefined) {
+    updated.repeatIntervalMinutes = normalizeCustomMinutes(patch.repeatIntervalMinutes, repeatIntervals);
+  }
+
+  if (patch.quotePreference) {
+    updated.quotePreference = normalizeQuotePreference(patch.quotePreference);
+  }
+
+  if (patch.nudgeTone !== undefined) {
+    updated.nudgeTone = normalizeNudgeTone(patch.nudgeTone);
+  }
+
+  if (patch.completed === true) {
+    updated.nextReminderAt = null;
+  } else if (patch.completed === false && !updated.nextReminderAt) {
+    updated.nextReminderAt = calculateNextReminderAt(updated.reminderAt, updated.reminderOffsetMinutes);
+  }
+
+  return updated;
+}
+
+export function normalizeSnoozeMinutes(value) {
+  return normalizeMinutes(value, snoozeIntervals, null);
+}
+
 export class TaskStore {
   constructor(filePath = defaultPath) {
     this.filePath = filePath;
@@ -74,32 +165,7 @@ export class TaskStore {
 
   async create(input) {
     const tasks = await this.readAll();
-    const now = new Date().toISOString();
-    const reminderOffsetMinutes = normalizeCustomMinutes(input.reminderOffsetMinutes, reminderOffsets);
-    const repeatIntervalMinutes = normalizeCustomMinutes(input.repeatIntervalMinutes, repeatIntervals);
-    const reminderAt = new Date(input.reminderAt).toISOString();
-    const minActiveOrder = tasks
-      .filter((existing) => !existing.completed && Number.isFinite(existing.order))
-      .reduce((min, existing) => Math.min(min, existing.order), 0);
-    const task = {
-      id: crypto.randomUUID(),
-      user_id: input.user_id || LOCAL_USER_ID,
-      title: input.title.trim(),
-      description: input.description?.trim() || '',
-      reminderAt,
-      reminderOffsetMinutes,
-      repeatIntervalMinutes,
-      nextReminderAt: calculateNextReminderAt(reminderAt, reminderOffsetMinutes),
-      reminderCount: 0,
-      quotePreference: normalizeQuotePreference(input.quotePreference),
-      nudgeTone: normalizeNudgeTone(input.nudgeTone),
-      lastReminder: null,
-      completed: false,
-      remindedAt: null,
-      order: minActiveOrder - 1,
-      createdAt: now,
-      updatedAt: now
-    };
+    const task = buildNewTask(input, tasks);
     tasks.unshift(task);
     await this.writeAll(tasks);
     return task;
@@ -131,57 +197,7 @@ export class TaskStore {
     const tasks = await this.readAll();
     const index = tasks.findIndex((task) => task.id === id);
     if (index === -1) return null;
-
-    const current = tasks[index];
-    const updated = {
-      ...current,
-      ...patch,
-      id: current.id,
-      updatedAt: new Date().toISOString()
-    };
-
-    const patchedReminderAt = patch.reminderAt ? new Date(patch.reminderAt).toISOString() : null;
-    const patchedOffset =
-      patch.reminderOffsetMinutes !== undefined
-        ? normalizeCustomMinutes(patch.reminderOffsetMinutes, reminderOffsets)
-        : null;
-    const reminderAtChanged = patchedReminderAt !== null && patchedReminderAt !== current.reminderAt;
-    const offsetChanged = patchedOffset !== null && patchedOffset !== current.reminderOffsetMinutes;
-
-    if (patchedReminderAt) {
-      updated.reminderAt = patchedReminderAt;
-    }
-    if (patchedOffset !== null) {
-      updated.reminderOffsetMinutes = patchedOffset;
-    }
-
-    if (reminderAtChanged || offsetChanged) {
-      updated.nextReminderAt = updated.completed
-        ? null
-        : calculateNextReminderAt(updated.reminderAt, updated.reminderOffsetMinutes);
-      updated.reminderCount = 0;
-      updated.remindedAt = null;
-      updated.lastReminder = null;
-    }
-
-    if (patch.repeatIntervalMinutes !== undefined) {
-      updated.repeatIntervalMinutes = normalizeCustomMinutes(patch.repeatIntervalMinutes, repeatIntervals);
-    }
-
-    if (patch.quotePreference) {
-      updated.quotePreference = normalizeQuotePreference(patch.quotePreference);
-    }
-
-    if (patch.nudgeTone !== undefined) {
-      updated.nudgeTone = normalizeNudgeTone(patch.nudgeTone);
-    }
-
-    if (patch.completed === true) {
-      updated.nextReminderAt = null;
-    } else if (patch.completed === false && !updated.nextReminderAt) {
-      updated.nextReminderAt = calculateNextReminderAt(updated.reminderAt, updated.reminderOffsetMinutes);
-    }
-
+    const updated = applyTaskUpdate(tasks[index], patch);
     tasks[index] = updated;
     await this.writeAll(tasks);
     return updated;
@@ -216,7 +232,7 @@ export class TaskStore {
   }
 
   async snooze(id, minutes) {
-    const snoozeMinutes = normalizeMinutes(minutes, snoozeIntervals, null);
+    const snoozeMinutes = normalizeSnoozeMinutes(minutes);
     if (!snoozeMinutes) return { task: null, error: 'Invalid snooze interval.' };
 
     const tasks = await this.readAll();
