@@ -81,6 +81,29 @@ Apply `server/supabase/schema.sql` to your Supabase project before flipping `DAT
 
 Service-role key safety: the key is only read on the backend, only used for repo queries, and never imported into any frontend file. Treat it like a database password — rotate it from the Supabase dashboard if it leaks.
 
+### Phase 5 environment variables (server, auth enforcement)
+
+| Variable | Required when | Purpose |
+|---|---|---|
+| `AUTH_MODE` | always (defaults to `off`) | `off` keeps the unauthenticated json flow. `supabase` enables real JWT verification on every protected route. |
+| `SUPABASE_JWT_SECRET` | `AUTH_MODE=supabase` | Project JWT secret used to verify HS256 Bearer tokens. **Server-only.** |
+
+When `AUTH_MODE=supabase` the server verifies the `Authorization: Bearer <jwt>` header on every request below and returns `401` with a specific error message on missing/malformed/expired/invalid tokens. The verified `sub` claim becomes `req.userId`; the user's `user_id` is never read from the request body.
+
+Protected routes:
+- `GET/POST /api/tasks`
+- `PATCH /api/tasks/:id`
+- `DELETE /api/tasks/:id`
+- `PUT /api/tasks/order`
+- `POST /api/tasks/:id/snooze`
+- `POST /api/content/quote`
+- `POST /api/content/motivational-quote`
+- `GET /api/reminders/stream` — token comes from `?token=<jwt>` because `EventSource` cannot send headers.
+
+`GET /api/health` stays public.
+
+If `AUTH_MODE=supabase` is set without `SUPABASE_JWT_SECRET`, the server fails fast on startup with a clear error. If a valid JWT-signed token has `aud != "authenticated"` (e.g. an anon-role token), it is rejected.
+
 ### Phase 4 environment variables (client)
 
 These belong in `client/.env.local` (or your Vercel project settings). Defaults preserve the unauthenticated local experience.

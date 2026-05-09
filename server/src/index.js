@@ -7,12 +7,13 @@ import { JsonTaskRepo } from './repo.js';
 import { SupabaseTaskRepo } from './supabaseRepo.js';
 import { ReminderScheduler } from './reminderScheduler.js';
 import { generateContent, listContentTypes, listQuoteOptions } from './content/index.js';
-import { authMiddleware } from './auth.js';
+import { authMiddleware, sseAuthMiddleware } from './auth.js';
 import {
   DATA_BACKEND,
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
-  validateBackendConfig
+  validateBackendConfig,
+  validateAuthConfig
 } from './config.js';
 
 function buildDefaultRepo() {
@@ -27,6 +28,10 @@ function buildDefaultRepo() {
 }
 
 export function createApp({ store, repo, scheduler } = {}) {
+  // Fail fast if AUTH_MODE=supabase is configured without the JWT secret;
+  // off-mode passes through with no requirements.
+  validateAuthConfig();
+
   let taskRepo = repo;
   if (!taskRepo) {
     taskRepo = store ? new JsonTaskRepo(store) : buildDefaultRepo();
@@ -58,9 +63,11 @@ export function createApp({ store, repo, scheduler } = {}) {
     res.json({ ok: true, contentTypes: listContentTypes(), quoteOptions: listQuoteOptions() });
   });
 
-  // All task routes go through authMiddleware so req.userId is populated.
-  // In AUTH_MODE=off this is a no-op that assigns LOCAL_USER_ID.
+  // All task and content routes go through authMiddleware so req.userId is
+  // populated. In AUTH_MODE=off this is a no-op that assigns LOCAL_USER_ID.
+  // In AUTH_MODE=supabase it verifies the Bearer token and rejects with 401.
   app.use('/api/tasks', authMiddleware);
+  app.use('/api/content', authMiddleware);
 
   app.get('/api/tasks', async (req, res, next) => {
     try {
@@ -180,7 +187,7 @@ export function createApp({ store, repo, scheduler } = {}) {
     }
   });
 
-  app.get('/api/reminders/stream', (req, res) => {
+  app.get('/api/reminders/stream', sseAuthMiddleware, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
