@@ -33,6 +33,9 @@ import {
   verticalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { AuthProvider, useAuth } from './AuthContext.jsx';
+import { SignInScreen, AuthLoadingScreen } from './SignInScreen.jsx';
+import { authHeaders } from './apiToken.js';
 import './styles.css';
 
 const quoteModes = [
@@ -71,16 +74,19 @@ function apiUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
+// authHeaders() returns {} when no session exists, so AUTH_MODE=off requests
+// look identical to before. When a Supabase session is active it adds
+// Authorization: Bearer <jwt>.
 const api = {
   async listTasks() {
-    const res = await fetch(apiUrl('/api/tasks'));
+    const res = await fetch(apiUrl('/api/tasks'), { headers: { ...authHeaders() } });
     if (!res.ok) throw new Error('Could not load tasks.');
     return res.json();
   },
   async createTask(payload) {
     const res = await fetch(apiUrl('/api/tasks'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
@@ -92,7 +98,7 @@ const api = {
   async updateTask(id, payload) {
     const res = await fetch(apiUrl(`/api/tasks/${id}`), {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(payload)
     });
     if (!res.ok) {
@@ -103,14 +109,15 @@ const api = {
   },
   async deleteTask(id) {
     const res = await fetch(apiUrl(`/api/tasks/${id}`), {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: { ...authHeaders() }
     });
     if (!res.ok) throw new Error('Could not delete task.');
   },
   async snoozeTask(id, minutes) {
     const res = await fetch(apiUrl(`/api/tasks/${id}/snooze`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ minutes })
     });
     if (!res.ok) {
@@ -122,7 +129,7 @@ const api = {
   async reorderTasks(orderedIds) {
     const res = await fetch(apiUrl('/api/tasks/order'), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ order: orderedIds })
     });
     if (!res.ok) {
@@ -148,6 +155,7 @@ function formatReminder(date) {
 }
 
 function App() {
+  const { accessToken, authEnabled, user, signOut } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [banner, setBanner] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -184,16 +192,27 @@ function App() {
     }, 4200);
   }
 
+  // When the access token changes (login, refresh, sign-out) reload tasks so
+  // the list reflects the right user. In AUTH_MODE=off this fires once with
+  // accessToken=null and behaves identically to before.
   useEffect(() => {
+    setLoading(true);
     api
       .listTasks()
       .then(setTasks)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    const events = new EventSource(apiUrl('/api/reminders/stream'));
+    const base = apiUrl('/api/reminders/stream');
+    // EventSource cannot send headers, so the token rides as a query string.
+    // Phase 6 will verify it server-side; in this phase the SSE endpoint is
+    // still unauthenticated so the param is harmless when present.
+    const url = accessToken
+      ? `${base}?token=${encodeURIComponent(accessToken)}`
+      : base;
+    const events = new EventSource(url);
     events.addEventListener('reminder', (event) => {
       const reminder = JSON.parse(event.data);
       setBanner(reminder);
@@ -224,7 +243,7 @@ function App() {
     });
     events.onerror = () => events.close();
     return () => events.close();
-  }, []);
+  }, [accessToken]);
 
   async function enableBrowserNotifications() {
     if (!('Notification' in window)) {
@@ -458,7 +477,18 @@ function App() {
           </div>
         </header>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {authEnabled && user && (
+            <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200 shadow-glow backdrop-blur">
+              <span className="truncate text-slate-300">{user.email}</span>
+              <button
+                onClick={() => signOut()}
+                className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-semibold text-slate-100 transition hover:bg-white/15"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <button
             onClick={enableBrowserNotifications}
             disabled={notificationPermission === 'granted'}
@@ -1431,7 +1461,23 @@ function StatusBadge({ task }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+function AuthGate() {
+  const { authEnabled, loading, session } = useAuth();
+  if (!authEnabled) return <App />;
+  if (loading) return <AuthLoadingScreen />;
+  if (!session) return <SignInScreen />;
+  return <App />;
+}
+
+function Root() {
+  return (
+    <AuthProvider>
+      <AuthGate />
+    </AuthProvider>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<Root />);
 
 function normalizeQuote(quote) {
   if (!quote) {

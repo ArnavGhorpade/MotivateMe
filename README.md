@@ -81,6 +81,25 @@ Apply `server/supabase/schema.sql` to your Supabase project before flipping `DAT
 
 Service-role key safety: the key is only read on the backend, only used for repo queries, and never imported into any frontend file. Treat it like a database password — rotate it from the Supabase dashboard if it leaks.
 
+### Phase 4 environment variables (client)
+
+These belong in `client/.env.local` (or your Vercel project settings). Defaults preserve the unauthenticated local experience.
+
+| Variable | Required when | Purpose |
+|---|---|---|
+| `VITE_AUTH_MODE` | always (defaults to `off`) | Set to `supabase` to enable the sign-in screen and Supabase session handling. |
+| `VITE_SUPABASE_URL` | `VITE_AUTH_MODE=supabase` | Same project URL as the server. |
+| `VITE_SUPABASE_ANON_KEY` | `VITE_AUTH_MODE=supabase` | Publishable anon key. **Never the service-role key.** |
+
+When `VITE_AUTH_MODE=off` (the default), the app renders exactly as before — no sign-in screen, no `Authorization` header, no token in the SSE URL. When `VITE_AUTH_MODE=supabase`:
+
+- A magic-link sign-in screen replaces the app until the user has a session.
+- All `/api/tasks*` requests carry `Authorization: Bearer <jwt>`.
+- `/api/reminders/stream` is opened with `?token=<jwt>` (EventSource cannot send headers).
+- The header shows the signed-in email and a Sign out button.
+
+Backend route protection still defaults to off in this phase — Phase 5 will verify the token. A misconfigured client (`VITE_AUTH_MODE=supabase` with missing keys) logs a console warning and falls back to the unauthenticated path so you don't lose local development.
+
 ## Run The App
 
 Run the backend and frontend together:
