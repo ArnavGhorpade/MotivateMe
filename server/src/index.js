@@ -37,8 +37,27 @@ export function createApp({ store, repo, scheduler } = {}) {
     taskRepo = store ? new JsonTaskRepo(store) : buildDefaultRepo();
   }
   const app = express();
-  const activeClients = new Set();
+  // Per-user SSE registry. Keys are userIds (LOCAL_USER_ID in off mode, the
+  // verified JWT subject in supabase mode). Each entry is a Set so a single
+  // user with multiple open tabs gets the reminder once per tab.
+  const clientsByUser = new Map();
   const reminderScheduler = scheduler || new ReminderScheduler(taskRepo);
+
+  function addClient(userId, send) {
+    let set = clientsByUser.get(userId);
+    if (!set) {
+      set = new Set();
+      clientsByUser.set(userId, set);
+    }
+    set.add(send);
+  }
+
+  function removeClient(userId, send) {
+    const set = clientsByUser.get(userId);
+    if (!set) return;
+    set.delete(send);
+    if (set.size === 0) clientsByUser.delete(userId);
+  }
   const allowedOrigins = new Set(
     [
       'http://localhost:5173',
@@ -193,22 +212,48 @@ export function createApp({ store, repo, scheduler } = {}) {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
+    const userId = req.userId;
     const send = (payload) => {
       res.write(`event: reminder\n`);
       res.write(`data: ${JSON.stringify(payload)}\n\n`);
     };
 
-    activeClients.add(send);
-    req.on('close', () => activeClients.delete(send));
+    addClient(userId, send);
+
+    // Heartbeat keeps proxies and load balancers from closing idle connections.
+    // SSE comments (": …\n\n") are ignored by EventSource on the client.
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {
+        // socket already closed; cleanup will run via 'close'
+      }
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      removeClient(userId, send);
+    });
   });
 
   reminderScheduler.on('reminder', (reminder) => {
-    for (const send of activeClients) {
+    // reminder.userId is set by the scheduler from task.user_id. Without it
+    // we have no way to route safely, so drop the event rather than risk a
+    // cross-user leak.
+    const userId = reminder?.userId;
+    if (!userId) return;
+    const sends = clientsByUser.get(userId);
+    if (!sends || sends.size === 0) return;
+    for (const send of sends) {
       send(reminder);
     }
   });
 
   app.locals.scheduler = reminderScheduler;
+  // Test hook so the SSE suite can verify the per-user map's shape without
+  // asserting implementation details. Returns a snapshot — never the live Map.
+  app.locals.activeClientUsers = () =>
+    new Map(Array.from(clientsByUser.entries()).map(([id, set]) => [id, set.size]));
 
   app.use((error, req, res, next) => {
     console.error(error);
