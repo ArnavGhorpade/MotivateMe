@@ -6,45 +6,46 @@
     "reminderAt": "2026-05-08T22:23:47.922Z",
     "reminderOffsetMinutes": 0,
     "repeatIntervalMinutes": 5,
-    "nextReminderAt": "2026-05-08T22:28:56.689Z",
-    "reminderCount": 1,
+    "nextReminderAt": "2026-05-14T18:04:33.865Z",
+    "reminderCount": 57,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "nudgeTone": "direct",
     "lastReminder": {
-      "text": "Put your materials in front of you and begin before the task grows larger in your mind.",
-      "author": "Unknown",
-      "type": "motivation",
-      "source": "local",
+      "text": "Consistency matters more than motivation. Start now.",
+      "author": "MotivateMe",
+      "type": "identity",
+      "source": "nudge",
       "tone": "direct",
-      "stage": "initial",
-      "sourceLabel": "Curated local quote",
+      "stage": "identity",
+      "sourceLabel": "Identity nudge",
       "toneLabel": "Direct nudge"
     },
     "completed": false,
-    "remindedAt": "2026-05-08T22:23:56.688Z",
+    "remindedAt": "2026-05-14T17:59:33.864Z",
     "createdAt": "2026-05-08T22:23:47.930Z",
-    "updatedAt": "2026-05-08T22:25:51.397Z",
-    "order": 1
+    "updatedAt": "2026-05-14T17:59:33.865Z",
+    "order": 1,
+    "user_id": "00000000-0000-0000-0000-000000000000"
   },
   {
     "id": "2a4a6685-aa2e-4d2f-9754-8b03d842f98b",
-    "title": "Complete Google Recommendations",
+    "title": "Complete Login",
     "description": "",
-    "reminderAt": "2026-05-08T22:03:03.031Z",
+    "reminderAt": "2026-05-08T22:03:00.000Z",
     "reminderOffsetMinutes": 0,
     "repeatIntervalMinutes": 1,
-    "nextReminderAt": "2026-05-08T22:29:16.011Z",
-    "reminderCount": 25,
+    "nextReminderAt": "2026-05-14T18:02:03.868Z",
+    "reminderCount": 240,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "nudgeTone": "tough",
     "lastReminder": {
-      "text": "Discipline shows up here, on Complete Google Recommendations, right now.",
+      "text": "Don't let Complete Login sit longer. Take control and start now.",
       "author": "MotivateMe",
       "type": "identity",
       "source": "nudge",
@@ -54,10 +55,11 @@
       "toneLabel": "Tough nudge"
     },
     "completed": false,
-    "remindedAt": "2026-05-08T22:28:16.010Z",
+    "remindedAt": "2026-05-14T18:01:03.867Z",
     "createdAt": "2026-05-08T22:03:03.041Z",
-    "updatedAt": "2026-05-08T22:28:16.011Z",
-    "order": 0
+    "updatedAt": "2026-05-14T18:01:03.869Z",
+    "order": 0,
+    "user_id": "00000000-0000-0000-0000-000000000000"
   },
   {
     "id": "2373e9f1-21f8-40c4-b5f0-93eea1fd5fdf",
@@ -87,6 +89,7 @@
     "createdAt": "2026-04-29T21:29:40.525Z",
     "updatedAt": "2026-05-08T18:37:29.961Z",
     "nudgeTone": "tough",
-    "order": -1777498180525
+    "order": -1777498180525,
+    "user_id": "00000000-0000-0000-0000-000000000000"
   }
 ]

@@ -9,6 +9,16 @@ import { ReminderScheduler } from './reminderScheduler.js';
 import { generateContent, listContentTypes, listQuoteOptions } from './content/index.js';
 import { authMiddleware, sseAuthMiddleware } from './auth.js';
 import {
+  ownerGateMiddleware,
+  ownerSseGateMiddleware,
+  validateOwnerConfig,
+  verifyOwnerPassword,
+  issueOwnerToken,
+  isOwnerGateEnabled,
+  sessionStatus,
+  TOKEN_EXPIRY_SECONDS as OWNER_TOKEN_EXPIRY_SECONDS
+} from './ownerAuth.js';
+import {
   DATA_BACKEND,
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
@@ -31,6 +41,9 @@ export function createApp({ store, repo, scheduler } = {}) {
   // Fail fast if AUTH_MODE=supabase is configured without the JWT secret;
   // off-mode passes through with no requirements.
   validateAuthConfig();
+  // Fail fast if owner gate is misconfigured (production without password,
+  // or password without session secret).
+  validateOwnerConfig();
 
   let taskRepo = repo;
   if (!taskRepo) {
@@ -82,11 +95,38 @@ export function createApp({ store, repo, scheduler } = {}) {
     res.json({ ok: true, contentTypes: listContentTypes(), quoteOptions: listQuoteOptions() });
   });
 
-  // All task and content routes go through authMiddleware so req.userId is
-  // populated. In AUTH_MODE=off this is a no-op that assigns LOCAL_USER_ID.
-  // In AUTH_MODE=supabase it verifies the Bearer token and rejects with 401.
-  app.use('/api/tasks', authMiddleware);
-  app.use('/api/content', authMiddleware);
+  // Public endpoints for the owner gate. /api/session is always 200 — the
+  // frontend reads ownerGateEnabled/authenticated to decide whether to show
+  // the login screen. /api/login returns 401 on a wrong password (with a
+  // constant-time compare inside verifyOwnerPassword) or 400 if the gate is
+  // disabled.
+  app.get('/api/session', (req, res) => {
+    res.json(sessionStatus(req));
+  });
+
+  app.post('/api/login', (req, res) => {
+    if (!isOwnerGateEnabled()) {
+      return res.status(400).json({ error: 'Owner gate is disabled.' });
+    }
+    const password = req.body?.password;
+    if (typeof password !== 'string' || !password) {
+      return res.status(400).json({ error: 'Password is required.' });
+    }
+    if (!verifyOwnerPassword(password)) {
+      return res.status(401).json({ error: 'Incorrect password.' });
+    }
+    return res.json({
+      token: issueOwnerToken(),
+      expiresIn: OWNER_TOKEN_EXPIRY_SECONDS
+    });
+  });
+
+  // Owner gate runs first so a missing/expired session token short-circuits
+  // before per-user auth even sees the request. In AUTH_MODE=off the second
+  // middleware assigns LOCAL_USER_ID; together they preserve the existing
+  // single-user flow while keeping the app private.
+  app.use('/api/tasks', ownerGateMiddleware, authMiddleware);
+  app.use('/api/content', ownerGateMiddleware, authMiddleware);
 
   app.get('/api/tasks', async (req, res, next) => {
     try {
@@ -206,7 +246,7 @@ export function createApp({ store, repo, scheduler } = {}) {
     }
   });
 
-  app.get('/api/reminders/stream', sseAuthMiddleware, (req, res) => {
+  app.get('/api/reminders/stream', ownerSseGateMiddleware, sseAuthMiddleware, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

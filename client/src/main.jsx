@@ -35,6 +35,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { SignInScreen, AuthLoadingScreen } from './SignInScreen.jsx';
+import { OwnerAuthProvider, useOwnerAuth } from './OwnerAuthContext.jsx';
+import { OwnerLoginScreen } from './OwnerLoginScreen.jsx';
 import { authHeaders } from './apiToken.js';
 import './styles.css';
 
@@ -155,7 +157,16 @@ function formatReminder(date) {
 }
 
 function App() {
-  const { accessToken, authEnabled, user, signOut } = useAuth();
+  const { accessToken: supabaseAccessToken, authEnabled, user, signOut } = useAuth();
+  const {
+    accessToken: ownerAccessToken,
+    gateEnabled: ownerGateEnabled,
+    signOut: ownerSignOut
+  } = useOwnerAuth();
+  // Either auth path can be live; whichever sets a token wins. They are
+  // mutually exclusive in practice (the deployed build uses the owner gate
+  // OR Supabase auth, never both).
+  const accessToken = ownerAccessToken || supabaseAccessToken;
   const [tasks, setTasks] = useState([]);
   const [banner, setBanner] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -483,6 +494,17 @@ function App() {
               <span className="truncate text-slate-300">{user.email}</span>
               <button
                 onClick={() => signOut()}
+                className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-semibold text-slate-100 transition hover:bg-white/15"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+          {ownerGateEnabled && !authEnabled && (
+            <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-2 text-sm text-slate-200 shadow-glow backdrop-blur">
+              <span className="text-slate-300">Owner</span>
+              <button
+                onClick={() => ownerSignOut()}
                 className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-semibold text-slate-100 transition hover:bg-white/15"
               >
                 Sign out
@@ -1469,11 +1491,22 @@ function AuthGate() {
   return <App />;
 }
 
+function OwnerGate({ children }) {
+  const { loading, gateEnabled, authenticated } = useOwnerAuth();
+  if (loading) return <AuthLoadingScreen />;
+  if (gateEnabled && !authenticated) return <OwnerLoginScreen />;
+  return children;
+}
+
 function Root() {
   return (
-    <AuthProvider>
-      <AuthGate />
-    </AuthProvider>
+    <OwnerAuthProvider>
+      <OwnerGate>
+        <AuthProvider>
+          <AuthGate />
+        </AuthProvider>
+      </OwnerGate>
+    </OwnerAuthProvider>
   );
 }
 

@@ -81,6 +81,26 @@ Apply `server/supabase/schema.sql` to your Supabase project before flipping `DAT
 
 Service-role key safety: the key is only read on the backend, only used for repo queries, and never imported into any frontend file. Treat it like a database password — rotate it from the Supabase dashboard if it leaks.
 
+### Owner gate (single shared password)
+
+A lightweight alternative to Supabase Auth: protect the deployed app with one password, without per-user accounts. Independent of `AUTH_MODE` — works fine alongside `AUTH_MODE=off` + `DATA_BACKEND=json`.
+
+| Variable | Required when | Purpose |
+|---|---|---|
+| `OWNER_APP_PASSWORD` | always in production; optional in dev | The single password that unlocks the app. **Server-only.** |
+| `OWNER_SESSION_SECRET` | when `OWNER_APP_PASSWORD` is set | HS256 signing secret for the 7-day session tokens. **Server-only.** |
+
+When `OWNER_APP_PASSWORD` is set:
+
+- `POST /api/login` accepts `{ password }`; on a constant-time match it returns `{ token, expiresIn }`. Wrong password → `401`.
+- `GET /api/session` reports `{ ownerGateEnabled, authenticated, expiresAt? }` — the frontend uses this on boot to decide whether to show the login screen.
+- All `/api/tasks*`, `/api/content/*`, and `GET /api/reminders/stream` require the bearer token. `/api/health` stays public.
+- Tokens are scoped to `aud="motivateme-owner"` so they can't be confused with Supabase JWTs.
+
+When `OWNER_APP_PASSWORD` is unset and `NODE_ENV !== "production"`, the gate is bypassed (existing local dev behavior). In production the server refuses to start without it.
+
+The frontend stores the session token in `localStorage` under `motivateme-owner-token`, sends it as `Authorization: Bearer …` on API calls and as `?token=…` on the EventSource URL, and shows a logout chip in the header.
+
 ### Phase 5 environment variables (server, auth enforcement)
 
 | Variable | Required when | Purpose |
