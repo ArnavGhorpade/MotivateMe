@@ -1,5 +1,212 @@
 [
   {
+    "id": "8636eeaf-7a6c-41c8-9cb0-3ba0ad04c8f7",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Review remaining MAVEN packet sections",
+    "description": "Read through the remaining 8 pages and identify each required response, document, or signature needed before submission.",
+    "reminderAt": "2026-05-14T19:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-14T20:03:09.259Z",
+    "reminderCount": 63,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": {
+      "text": "Discipline shows up here, on Review remaining MAVEN packet sections, right now.",
+      "author": "MotivateMe",
+      "type": "identity",
+      "source": "nudge",
+      "tone": "tough",
+      "stage": "identity",
+      "sourceLabel": "Identity nudge",
+      "toneLabel": "Tough nudge"
+    },
+    "completed": false,
+    "remindedAt": "2026-05-14T20:02:09.259Z",
+    "order": -9,
+    "createdAt": "2026-05-14T18:51:24.307Z",
+    "updatedAt": "2026-05-14T20:02:09.260Z"
+  },
+  {
+    "id": "be2ff3b2-8c52-4546-904f-30754925625a",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Complete packet pages 5-6",
+    "description": "Fill out and finalize the next two unfinished MAVEN packet pages carefully and accurately.",
+    "reminderAt": "2026-05-15T14:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-15T14:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -8,
+    "createdAt": "2026-05-14T18:51:24.304Z",
+    "updatedAt": "2026-05-14T18:51:24.304Z"
+  },
+  {
+    "id": "2b25b9b0-d2ef-44a6-b2fd-f39173d8cac1",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Review pages 5-6 for errors",
+    "description": "Check completed pages for missing answers, formatting mistakes, signatures, or incomplete fields.",
+    "reminderAt": "2026-05-15T17:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-15T17:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -7,
+    "createdAt": "2026-05-14T18:51:24.300Z",
+    "updatedAt": "2026-05-14T18:51:24.300Z"
+  },
+  {
+    "id": "e45e1351-db47-4ec9-b19f-405245d20e6e",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Complete packet pages 7-8",
+    "description": "Work through and complete pages 7 and 8 of the MAVEN packet with full responses and required information.",
+    "reminderAt": "2026-05-16T14:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-16T14:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -6,
+    "createdAt": "2026-05-14T18:51:24.293Z",
+    "updatedAt": "2026-05-14T18:51:24.293Z"
+  },
+  {
+    "id": "08338c90-83da-4d56-bc92-5c4b9cafb056",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Complete packet pages 9-10",
+    "description": "Finish pages 9 and 10, making sure all sections are answered clearly and consistently.",
+    "reminderAt": "2026-05-16T17:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-16T17:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -5,
+    "createdAt": "2026-05-14T18:51:24.289Z",
+    "updatedAt": "2026-05-14T18:51:24.289Z"
+  },
+  {
+    "id": "68ac3e94-e3fd-4969-ad99-29a25ee79b44",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Complete packet pages 11-12",
+    "description": "Finish the last two pages of the MAVEN packet and verify all required information is included.",
+    "reminderAt": "2026-05-17T14:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-17T14:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -4,
+    "createdAt": "2026-05-14T18:51:24.286Z",
+    "updatedAt": "2026-05-14T18:51:24.286Z"
+  },
+  {
+    "id": "4f9531ce-cd6e-44b3-b357-0cb65fc133c1",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Gather missing supporting information",
+    "description": "Collect any missing references, signatures, dates, contact details, or supporting information required for submission.",
+    "reminderAt": "2026-05-17T17:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-17T17:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -3,
+    "createdAt": "2026-05-14T18:51:24.283Z",
+    "updatedAt": "2026-05-14T18:51:24.283Z"
+  },
+  {
+    "id": "30ebf1e6-0560-4e28-bce9-44a35867248a",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Final MAVEN packet proofreading",
+    "description": "Read through the full 12-page packet from start to finish and fix any remaining mistakes or incomplete sections.",
+    "reminderAt": "2026-05-18T14:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-18T14:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -2,
+    "createdAt": "2026-05-14T18:51:24.278Z",
+    "updatedAt": "2026-05-14T18:51:24.278Z"
+  },
+  {
+    "id": "bb5199b5-3ad2-4ddb-89d1-d56629628941",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Submit completed MAVEN packet",
+    "description": "Submit the finalized MAVEN packet before the deadline and confirm successful delivery or upload.",
+    "reminderAt": "2026-05-18T17:00:00.000Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-18T17:00:00.000Z",
+    "reminderCount": 0,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "tough",
+    "lastReminder": null,
+    "completed": false,
+    "remindedAt": null,
+    "order": -1,
+    "createdAt": "2026-05-14T18:51:24.270Z",
+    "updatedAt": "2026-05-14T18:51:24.270Z"
+  },
+  {
     "id": "2aa8933f-b67b-458d-979b-36baafed41f7",
     "user_id": "00000000-0000-0000-0000-000000000000",
     "title": "Complete Login Issue",
@@ -7,45 +214,15 @@
     "reminderAt": "2026-05-14T18:12:00.000Z",
     "reminderOffsetMinutes": 0,
     "repeatIntervalMinutes": 1,
-    "nextReminderAt": "2026-05-14T18:14:08.897Z",
-    "reminderCount": 1,
+    "nextReminderAt": null,
+    "reminderCount": 12,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "nudgeTone": "direct",
     "lastReminder": {
-      "text": "This task does not need your whole life. It needs your next half hour.",
-      "author": "Unknown",
-      "type": "motivation",
-      "source": "local",
-      "tone": "direct",
-      "stage": "initial",
-      "sourceLabel": "Curated local quote",
-      "toneLabel": "Direct nudge"
-    },
-    "completed": false,
-    "remindedAt": "2026-05-14T18:13:08.896Z",
-    "order": -1,
-    "createdAt": "2026-05-14T18:12:48.124Z",
-    "updatedAt": "2026-05-14T18:13:08.898Z"
-  },
-  {
-    "id": "1eec22c5-4726-4c5e-8f91-8ae1c582c817",
-    "title": "Complete MAVEN Linux Packet",
-    "description": "",
-    "reminderAt": "2026-05-08T22:23:47.922Z",
-    "reminderOffsetMinutes": 0,
-    "repeatIntervalMinutes": 5,
-    "nextReminderAt": "2026-05-14T18:14:33.897Z",
-    "reminderCount": 59,
-    "quotePreference": {
-      "mode": "motivation",
-      "customMessage": ""
-    },
-    "nudgeTone": "direct",
-    "lastReminder": {
-      "text": "You scheduled Complete MAVEN Linux Packet. Follow through with one small step.",
+      "text": "Plans only count when you act on them. Take one step on Complete Login Issue.",
       "author": "MotivateMe",
       "type": "identity",
       "source": "nudge",
@@ -54,12 +231,11 @@
       "sourceLabel": "Identity nudge",
       "toneLabel": "Direct nudge"
     },
-    "completed": false,
-    "remindedAt": "2026-05-14T18:09:33.897Z",
-    "createdAt": "2026-05-08T22:23:47.930Z",
-    "updatedAt": "2026-05-14T18:09:33.898Z",
-    "order": 1,
-    "user_id": "00000000-0000-0000-0000-000000000000"
+    "completed": true,
+    "remindedAt": "2026-05-14T18:24:23.933Z",
+    "order": -1,
+    "createdAt": "2026-05-14T18:12:48.124Z",
+    "updatedAt": "2026-05-14T18:25:23.786Z"
   },
   {
     "id": "2a4a6685-aa2e-4d2f-9754-8b03d842f98b",
