@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { setApiAccessToken } from './apiToken.js';
+import { setOwnerAccessToken } from './apiToken.js';
 
 const TOKEN_STORAGE_KEY = 'motivateme-owner-token';
 const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/$/, '');
@@ -42,14 +42,14 @@ export function OwnerAuthProvider({ children }) {
 
   function applyToken(next) {
     writeStoredToken(next);
-    setApiAccessToken(next);
+    setOwnerAccessToken(next);
     setAccessTokenState(next);
   }
 
   useEffect(() => {
     const stored = readStoredToken();
     if (stored) {
-      setApiAccessToken(stored);
+      setOwnerAccessToken(stored);
       setAccessTokenState(stored);
     }
 

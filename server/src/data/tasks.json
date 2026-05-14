@@ -1,20 +1,51 @@
 [
   {
-    "id": "1eec22c5-4726-4c5e-8f91-8ae1c582c817",
-    "title": "Complete MAVEN Linux Packet",
+    "id": "2aa8933f-b67b-458d-979b-36baafed41f7",
+    "user_id": "00000000-0000-0000-0000-000000000000",
+    "title": "Complete Login Issue",
     "description": "",
-    "reminderAt": "2026-05-08T22:23:47.922Z",
+    "reminderAt": "2026-05-14T18:12:00.000Z",
     "reminderOffsetMinutes": 0,
-    "repeatIntervalMinutes": 5,
-    "nextReminderAt": "2026-05-14T18:04:33.865Z",
-    "reminderCount": 57,
+    "repeatIntervalMinutes": 1,
+    "nextReminderAt": "2026-05-14T18:14:08.897Z",
+    "reminderCount": 1,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "nudgeTone": "direct",
     "lastReminder": {
-      "text": "Consistency matters more than motivation. Start now.",
+      "text": "This task does not need your whole life. It needs your next half hour.",
+      "author": "Unknown",
+      "type": "motivation",
+      "source": "local",
+      "tone": "direct",
+      "stage": "initial",
+      "sourceLabel": "Curated local quote",
+      "toneLabel": "Direct nudge"
+    },
+    "completed": false,
+    "remindedAt": "2026-05-14T18:13:08.896Z",
+    "order": -1,
+    "createdAt": "2026-05-14T18:12:48.124Z",
+    "updatedAt": "2026-05-14T18:13:08.898Z"
+  },
+  {
+    "id": "1eec22c5-4726-4c5e-8f91-8ae1c582c817",
+    "title": "Complete MAVEN Linux Packet",
+    "description": "",
+    "reminderAt": "2026-05-08T22:23:47.922Z",
+    "reminderOffsetMinutes": 0,
+    "repeatIntervalMinutes": 5,
+    "nextReminderAt": "2026-05-14T18:14:33.897Z",
+    "reminderCount": 59,
+    "quotePreference": {
+      "mode": "motivation",
+      "customMessage": ""
+    },
+    "nudgeTone": "direct",
+    "lastReminder": {
+      "text": "You scheduled Complete MAVEN Linux Packet. Follow through with one small step.",
       "author": "MotivateMe",
       "type": "identity",
       "source": "nudge",
@@ -24,9 +55,9 @@
       "toneLabel": "Direct nudge"
     },
     "completed": false,
-    "remindedAt": "2026-05-14T17:59:33.864Z",
+    "remindedAt": "2026-05-14T18:09:33.897Z",
     "createdAt": "2026-05-08T22:23:47.930Z",
-    "updatedAt": "2026-05-14T17:59:33.865Z",
+    "updatedAt": "2026-05-14T18:09:33.898Z",
     "order": 1,
     "user_id": "00000000-0000-0000-0000-000000000000"
   },
@@ -37,15 +68,15 @@
     "reminderAt": "2026-05-08T22:03:00.000Z",
     "reminderOffsetMinutes": 0,
     "repeatIntervalMinutes": 1,
-    "nextReminderAt": "2026-05-14T18:02:03.868Z",
-    "reminderCount": 240,
+    "nextReminderAt": null,
+    "reminderCount": 249,
     "quotePreference": {
       "mode": "motivation",
       "customMessage": ""
     },
     "nudgeTone": "tough",
     "lastReminder": {
-      "text": "Don't let Complete Login sit longer. Take control and start now.",
+      "text": "Discipline shows up here, on Complete Login, right now.",
       "author": "MotivateMe",
       "type": "identity",
       "source": "nudge",
@@ -54,10 +85,10 @@
       "sourceLabel": "Identity nudge",
       "toneLabel": "Tough nudge"
     },
-    "completed": false,
-    "remindedAt": "2026-05-14T18:01:03.867Z",
+    "completed": true,
+    "remindedAt": "2026-05-14T18:10:03.898Z",
     "createdAt": "2026-05-08T22:03:03.041Z",
-    "updatedAt": "2026-05-14T18:01:03.869Z",
+    "updatedAt": "2026-05-14T18:10:11.568Z",
     "order": 0,
     "user_id": "00000000-0000-0000-0000-000000000000"
   },

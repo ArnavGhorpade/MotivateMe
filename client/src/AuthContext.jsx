@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseAuthEnabled } from './supabaseClient.js';
-import { setApiAccessToken } from './apiToken.js';
+import { setSupabaseAccessToken } from './apiToken.js';
 
 const AuthContext = createContext({
   session: null,
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (!isSupabaseAuthEnabled || !supabase) {
-      setApiAccessToken(null);
+      setSupabaseAccessToken(null);
       return;
     }
 
@@ -33,13 +33,13 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
       const next = data.session ?? null;
       setSession(next);
-      setApiAccessToken(next?.access_token ?? null);
+      setSupabaseAccessToken(next?.access_token ?? null);
       setLoading(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession ?? null);
-      setApiAccessToken(nextSession?.access_token ?? null);
+      setSupabaseAccessToken(nextSession?.access_token ?? null);
     });
 
     return () => {
