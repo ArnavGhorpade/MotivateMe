@@ -676,6 +676,9 @@ function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
         onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
         placeholder="Finish biology lab summary"
         className="field-input"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={true}
       />
 
       <label className="field-label mt-4" htmlFor={descId}>
@@ -690,6 +693,9 @@ function TaskFormFields({ form, setForm, idPrefix = 'create' }) {
         }
         placeholder="Optional notes, links, or study context"
         className="field-input resize-none"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={true}
       />
 
       <label className="field-label mt-4" htmlFor={reminderId}>
