@@ -13,6 +13,7 @@ import {
   Plus,
   Quote,
   Repeat2,
+  Sparkles,
   Target,
   Trash2,
   X
@@ -37,6 +38,7 @@ import { AuthProvider, useAuth } from './AuthContext.jsx';
 import { SignInScreen, AuthLoadingScreen } from './SignInScreen.jsx';
 import { OwnerAuthProvider, useOwnerAuth } from './OwnerAuthContext.jsx';
 import { OwnerLoginScreen } from './OwnerLoginScreen.jsx';
+import { ProjectPlannerImport } from './ProjectPlannerImport.jsx';
 import { authHeaders } from './apiToken.js';
 import './styles.css';
 
@@ -177,6 +179,8 @@ function App() {
   const [editCandidate, setEditCandidate] = useState(null);
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [plannerOpen, setPlannerOpen] = useState(false);
+  const [plannerImporting, setPlannerImporting] = useState(false);
   const [celebration, setCelebration] = useState(null);
   const [notificationPermission, setNotificationPermission] = useState(() =>
     'Notification' in window ? Notification.permission : 'unavailable'
@@ -464,6 +468,52 @@ function App() {
     }
   }
 
+  async function handlePlannerImport(plannerTasks) {
+    if (!Array.isArray(plannerTasks) || plannerTasks.length === 0) return;
+    setPlannerImporting(true);
+    const created = [];
+    let failedAt = -1;
+    let failureMessage = '';
+    // Create newest-last so the earliest-due task ends up at the top of the
+    // active list. The backend assigns each new task an order that's smaller
+    // than every existing active task, so iterating in reverse keeps the
+    // visible order aligned with the AI's intended sequence.
+    const reversed = plannerTasks.slice().reverse();
+    try {
+      for (let i = 0; i < reversed.length; i++) {
+        const task = await api.createTask(reversed[i]);
+        created.push(task);
+      }
+    } catch (err) {
+      failedAt = created.length;
+      failureMessage = err.message || 'Could not import a task.';
+    }
+
+    if (created.length > 0) {
+      setTasks((current) => [...created, ...current]);
+    }
+
+    if (failureMessage) {
+      addToast({
+        title: 'Import partially failed',
+        message: `Imported ${created.length} of ${plannerTasks.length} tasks before stopping at #${
+          failedAt + 1
+        }: ${failureMessage}`,
+        tone: 'error'
+      });
+      setPlannerImporting(false);
+      throw new Error(failureMessage);
+    }
+
+    setPlannerImporting(false);
+    setPlannerOpen(false);
+    addToast({
+      title: 'Project imported',
+      message: `Created ${created.length} task${created.length === 1 ? '' : 's'} from your project plan.`,
+      tone: 'success'
+    });
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <div className="absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.38),transparent_36%),linear-gradient(120deg,rgba(37,99,235,0.28),rgba(168,85,247,0.22),transparent_62%)]" />
@@ -548,6 +598,20 @@ function App() {
           onReorder={handleReorderActive}
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-slate-400">
+            Have a bigger project? Generate scheduled tasks from a plan.
+          </div>
+          <button
+            type="button"
+            onClick={() => setPlannerOpen(true)}
+            className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] px-4 text-sm font-semibold text-slate-100 transition hover:bg-white/15"
+          >
+            <Sparkles size={16} />
+            Break down a project
+          </button>
+        </div>
+
         <TaskForm form={form} setForm={setForm} saving={saving} onSubmit={handleSubmit} />
 
         <CompletedTaskList
@@ -574,6 +638,13 @@ function App() {
           onSave={handleEditSave}
           saving={editSaving}
           error={editError}
+        />
+      )}
+      {plannerOpen && (
+        <ProjectPlannerImport
+          onCancel={() => (plannerImporting ? null : setPlannerOpen(false))}
+          onImport={handlePlannerImport}
+          importing={plannerImporting}
         />
       )}
     </main>
