@@ -301,13 +301,16 @@ function App() {
         tone: 'reminder'
       });
       if (notificationsEnabledRef.current) {
-        const bodyParts = [];
-        if (quote.text) bodyParts.push(quote.text);
-        if (quote.author && quote.author !== 'You') bodyParts.push(`— ${quote.author}`);
-        if (reminder.taskDescription) bodyParts.push(reminder.taskDescription);
+        const bodyLines = [];
+        if (quote.text) bodyLines.push(`"${quote.text}"`);
+        if (reminder.taskTitle) {
+          if (bodyLines.length) bodyLines.push('');
+          bodyLines.push('Task:');
+          bodyLines.push(reminder.taskTitle);
+        }
         showNotification({
-          title: `MotivateMe: ${reminder.taskTitle}`,
-          body: bodyParts.join('\n').trim() || 'Time to focus.',
+          title: 'MotivateMe',
+          body: bodyLines.join('\n') || 'Time to focus.',
           tag: `motivateme-task-${reminder.taskId}`
         });
       }
