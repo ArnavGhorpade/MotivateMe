@@ -66,6 +66,7 @@ export class ReminderScheduler extends EventEmitter {
           // owning user's connected clients.
           userId: task.user_id,
           taskTitle: task.title,
+          taskDescription: task.description || '',
           reminderAt: task.reminderAt,
           nextReminderAt: task.nextReminderAt,
           reminderCount: (task.reminderCount || 0) + 1,

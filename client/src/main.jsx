@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Bell,
+  BellOff,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -185,6 +186,55 @@ function App() {
   const [notificationPermission, setNotificationPermission] = useState(() =>
     'Notification' in window ? Notification.permission : 'unavailable'
   );
+  // Independent of OS permission: the user can keep permission granted but
+  // mute the app's notifications. Persisted so it survives reloads.
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem('motivateme-notifications-enabled');
+      return stored === null ? true : stored === 'true';
+    } catch {
+      return true;
+    }
+  });
+  // Mirror in a ref so the SSE useEffect closure can read the latest value
+  // without forcing the EventSource to reconnect on every toggle.
+  const notificationsEnabledRef = useRef(notificationsEnabled);
+  useEffect(() => {
+    notificationsEnabledRef.current = notificationsEnabled;
+    try {
+      window.localStorage.setItem(
+        'motivateme-notifications-enabled',
+        String(notificationsEnabled)
+      );
+    } catch {
+      // ignore — private mode etc.
+    }
+  }, [notificationsEnabled]);
+  // Track OS-level permission changes (user revokes/grants in browser settings)
+  // via the Permissions API where it's supported.
+  useEffect(() => {
+    if (!('permissions' in navigator) || typeof navigator.permissions.query !== 'function') {
+      return;
+    }
+    let active = true;
+    let status;
+    navigator.permissions
+      .query({ name: 'notifications' })
+      .then((permissionStatus) => {
+        if (!active) return;
+        status = permissionStatus;
+        setNotificationPermission(status.state);
+        status.onchange = () => setNotificationPermission(status.state);
+      })
+      .catch(() => {
+        // Some Safari versions reject querying 'notifications' — fall back
+        // to the static value read at mount.
+      });
+    return () => {
+      active = false;
+      if (status) status.onchange = null;
+    };
+  }, []);
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -250,9 +300,15 @@ function App() {
         message: quote.text,
         tone: 'reminder'
       });
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(`MotivateMe: ${reminder.taskTitle}`, {
-          body: `${quote.text} - ${quote.author}`
+      if (notificationsEnabledRef.current) {
+        const bodyParts = [];
+        if (quote.text) bodyParts.push(quote.text);
+        if (quote.author && quote.author !== 'You') bodyParts.push(`— ${quote.author}`);
+        if (reminder.taskDescription) bodyParts.push(reminder.taskDescription);
+        showNotification({
+          title: `MotivateMe: ${reminder.taskTitle}`,
+          body: bodyParts.join('\n').trim() || 'Time to focus.',
+          tag: `motivateme-task-${reminder.taskId}`
         });
       }
     });
@@ -260,26 +316,128 @@ function App() {
     return () => events.close();
   }, [accessToken]);
 
+  function showNotification({ title, body, tag }) {
+    if (!('Notification' in window)) {
+      return { ok: false, reason: 'unsupported' };
+    }
+    if (Notification.permission !== 'granted') {
+      return { ok: false, reason: 'not-granted' };
+    }
+    try {
+      const notification = new Notification(title, {
+        body,
+        tag,
+        icon: '/motivateme-icon-192.png',
+        badge: '/favicon-32.png',
+        renotify: Boolean(tag)
+      });
+      notification.onclick = () => {
+        try {
+          window.focus();
+        } catch {
+          /* ignore */
+        }
+        try {
+          notification.close();
+        } catch {
+          /* ignore */
+        }
+      };
+      return { ok: true, notification };
+    } catch (err) {
+      return { ok: false, reason: 'threw', error: err };
+    }
+  }
+
   async function enableBrowserNotifications() {
     if (!('Notification' in window)) {
       setNotificationPermission('unavailable');
       addToast({
         title: 'Browser notifications unavailable',
-        message: 'In-app reminders will keep working.',
+        message: 'This browser does not support the Notification API. In-app reminders still work.',
         tone: 'warning'
       });
       return;
     }
-
     const permission = await Notification.requestPermission();
     setNotificationPermission(permission);
+    if (permission === 'granted') {
+      setNotificationsEnabled(true);
+      addToast({
+        title: 'Browser notifications enabled',
+        message: 'Send a test to confirm macOS isn’t suppressing them.',
+        tone: 'success'
+      });
+    } else if (permission === 'denied') {
+      addToast({
+        title: 'Browser notifications blocked',
+        message:
+          'macOS: System Settings → Notifications → your browser. Then click the site lock icon to allow this site.',
+        tone: 'warning'
+      });
+    } else {
+      addToast({
+        title: 'Browser notifications off',
+        message: 'No worries. In-app reminders will keep working.',
+        tone: 'warning'
+      });
+    }
+  }
+
+  function toggleAppNotifications() {
+    setNotificationsEnabled((current) => {
+      const next = !current;
+      addToast({
+        title: next ? 'Notifications enabled' : 'Notifications disabled',
+        message: next
+          ? 'Reminders will trigger a desktop notification when this tab is open.'
+          : 'Reminders will only show in-app while this tab is open.',
+        tone: next ? 'success' : 'info'
+      });
+      return next;
+    });
+  }
+
+  function sendTestNotification() {
+    const result = showNotification({
+      title: 'MotivateMe test notification',
+      body: 'If you can see this, browser notifications are wired up. Reminders will use the same path.',
+      tag: 'motivateme-test'
+    });
+    if (result.ok) {
+      addToast({
+        title: 'Test notification sent',
+        message:
+          'If you didn’t see it, check macOS System Settings → Notifications → your browser, and turn off Do Not Disturb.',
+        tone: 'success'
+      });
+    } else if (result.reason === 'unsupported') {
+      addToast({
+        title: 'Notifications unsupported',
+        message: 'This browser does not support the Notification API.',
+        tone: 'error'
+      });
+    } else if (result.reason === 'not-granted') {
+      addToast({
+        title: 'Permission required',
+        message: 'Click Enable browser notifications first.',
+        tone: 'warning'
+      });
+    } else {
+      addToast({
+        title: 'Test notification failed',
+        message: result.error?.message || 'The browser refused to display the notification.',
+        tone: 'error'
+      });
+    }
+  }
+
+  function showDeniedHelp() {
     addToast({
-      title: permission === 'granted' ? 'Browser notifications enabled' : 'Browser notifications off',
+      title: 'Notifications are blocked',
       message:
-        permission === 'granted'
-          ? 'System notifications will appear when reminders fire.'
-          : 'No worries. In-app reminders will keep working.',
-      tone: permission === 'granted' ? 'success' : 'warning'
+        'macOS: System Settings → Notifications → your browser → Allow. Safari: Settings → Websites → Notifications. Chrome/Edge: site lock icon → Site settings → Notifications → Allow.',
+      tone: 'warning'
     });
   }
 
@@ -561,16 +719,14 @@ function App() {
               </button>
             </div>
           )}
-          <button
-            onClick={enableBrowserNotifications}
-            disabled={notificationPermission === 'granted'}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/15 disabled:cursor-default disabled:text-emerald-200"
-          >
-            <Bell size={16} />
-            {notificationPermission === 'granted'
-              ? 'Browser notifications enabled'
-              : 'Enable browser notifications'}
-          </button>
+          <NotificationSettings
+            permission={notificationPermission}
+            enabled={notificationsEnabled}
+            onEnable={enableBrowserNotifications}
+            onToggle={toggleAppNotifications}
+            onTest={sendTestNotification}
+            onShowDeniedHelp={showDeniedHelp}
+          />
         </div>
 
         {banner && <ReminderBanner reminder={banner} onClose={() => setBanner(null)} />}
@@ -694,6 +850,74 @@ function StatCard({ icon, label, value }) {
         {label}
       </div>
       <div className="mt-2 text-3xl font-semibold text-white">{value}</div>
+    </div>
+  );
+}
+
+function NotificationSettings({
+  permission,
+  enabled,
+  onEnable,
+  onToggle,
+  onTest,
+  onShowDeniedHelp
+}) {
+  if (permission === 'unavailable') {
+    return (
+      <div
+        className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-400"
+        title="This browser does not support the Notification API."
+      >
+        <BellOff size={14} />
+        Notifications unsupported
+      </div>
+    );
+  }
+  if (permission === 'denied') {
+    return (
+      <button
+        type="button"
+        onClick={onShowDeniedHelp}
+        className="inline-flex items-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/15"
+        title="Click for setup help"
+      >
+        <BellOff size={14} />
+        Notifications blocked
+      </button>
+    );
+  }
+  if (permission !== 'granted') {
+    return (
+      <button
+        type="button"
+        onClick={onEnable}
+        className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+      >
+        <Bell size={14} />
+        Enable browser notifications
+      </button>
+    );
+  }
+  return (
+    <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5">
+      <span className="inline-flex items-center gap-1.5 px-1 text-xs font-semibold text-slate-200">
+        <Bell size={13} className={enabled ? 'text-emerald-200' : 'text-slate-400'} />
+        Notifications {enabled ? 'on' : 'off'}
+      </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/15"
+      >
+        {enabled ? 'Disable' : 'Enable'}
+      </button>
+      <button
+        type="button"
+        onClick={onTest}
+        className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/15"
+      >
+        Test
+      </button>
     </div>
   );
 }
